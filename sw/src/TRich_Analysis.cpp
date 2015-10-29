@@ -38,7 +38,7 @@
 #include "TRich_TDC.h"
 #include "TRich_Adapter.h"
 
-#define SIZEOFCANV 300
+#define SIZEOFCANV 200
 
 
 TRich_Analysis::TRich_Analysis(const char * fileraw){
@@ -285,7 +285,6 @@ void TRich_Analysis::Ingest(){
   	TFile * lfile;
   	TTree * ltree;
   
-  	// scan variables
   	TFile * lscanfile;
   	TTree * lscantree;
   	TH1F * 	lhRise;
@@ -1013,7 +1012,11 @@ void TRich_Analysis::TDC_Draw(TH1F * hRise,TH1F * hFall){
 
 void TRich_Analysis::ProcessTDC(){
 
-	printf("%s...\n",__FUNCTION__);
+
+
+
+/*
+	printf("%s... file %s\n",__FUNCTION__,fioTDCroot.c_str());
 	bool printEvents 	= false;
 	bool printEdges 	= false;
 	bool hitreconstruction	= true;
@@ -1028,17 +1031,17 @@ void TRich_Analysis::ProcessTDC(){
  	UInt_t lwindow	= this->GetEventBuilderWindow();
  	lwindow = 8*lwindow; // in ns
   
-  	/*
-    	printf("Settings MAROC3:\n");
+  	
+    //	printf("Settings MAROC3:\n");
     
-    	printf("Threshold [DAC0 unit] = %d\n",thr);
-    	printf("GAIN %4d ",gain);
+   // 	printf("Threshold [DAC0 unit] = %d\n",thr);
+    //	printf("GAIN %4d ",gain);
     
-    	printf("Settings FPGA:\n");
-    	printf("Trigger delay           =%5d -> %d*[8ns] = %5d [ns]\n",ltrigdly,ltrigdly,ltrigdly*8);  //128*8ns = 1024ns trigger delay
-    	printf("Event Builder LookBack  =%5d -> %d*[8ns] = %5d [ns]\n",llookback,llookback,llookback*8);
-    	printf("Event Builder Window	=%5d -> %d*[8ns] = %5d [ns]\n",lwindow,lwindow,lwindow*8);	
-  	*/
+   // 	printf("Settings FPGA:\n");
+    //	printf("Trigger delay           =%5d -> %d*[8ns] = %5d [ns]\n",ltrigdly,ltrigdly,ltrigdly*8);  //128*8ns = 1024ns trigger delay
+    //	printf("Event Builder LookBack  =%5d -> %d*[8ns] = %5d [ns]\n",llookback,llookback,llookback*8);
+    //	printf("Event Builder Window	=%5d -> %d*[8ns] = %5d [ns]\n",lwindow,lwindow,lwindow*8);	
+  	
   
   	TFile * lfile = new TFile(fioTDCroot.c_str(),"UPDATE"); if(lfile->IsZombie()){printf("pFile is Zombie!\n");}
   	TTree * ltree = (TTree*)lfile->Get("TDCdata"); // better using a macro in general header
@@ -1054,7 +1057,7 @@ void TRich_Analysis::ProcessTDC(){
   
   	int maxHz = 1000*1000; // 1 MHz
  	// int maxEdges = 3*4*64; // max 4 edges/channel per trigger (at the baseline is Billions but they will go in overflow bin)
- 	int maxEdges = 64; // max 4 edges/channel per trigger (at the baseline is Billions but they will go in overflow bin)
+ 	int maxEdges = 250; // max 4 edges/channel per trigger (at the baseline is Billions but they will go in overflow bin)
     
 
   	int totEvts = ltree->GetEntries();
@@ -1073,19 +1076,24 @@ void TRich_Analysis::ProcessTDC(){
   	TH1F * hTFall = new TH1F("hTFall","",timmax-timmin,timmin-0.5,timmax-0.5);
 
   	hTRise->SetTitle("All channels - Edge Time Distribution");
-   
+  	hTFall->SetTitle("All channels - Edge Time Distribution");
+	
+  	//TH2F * hTFallvsTot = new TH2F("hTFallvsTot","",timmax-timmin,timmin-0.5,timmax-0.5,timmax-timmin,timmin-0.5,timmax-0.5);
+  	//TH2F * hTRisevsTot = new TH2F("hTRisevsTot","",timmax-timmin,timmin-0.5,timmax-0.5,timmax-timmin,timmin-0.5,timmax-0.5);
 
  	TH1F * hTRiseCh[192]; 
   	TH1F * hTFallCh[192];
   	TH1F * hTotCh[192];
 
+
 	for (int i=0; i<192; i++) {
- 		int ltmin = 200;
-		int ltmax = 400;
+ 		//nt ltmin = 200;
+		//int ltmax = 400;
 		
-		timmin = ltmin;
-		timmax = ltmax;
-    		hTRiseCh[i] = new TH1F(Form("ch%03dTRise",i),"",timmax-timmin,timmin-0.5,timmax-0.5);
+	//	timmin = ltmin;
+	//	timmax = ltmax;
+    		
+hTRiseCh[i] = new TH1F(Form("ch%03dTRise",i),"",timmax-timmin,timmin-0.5,timmax-0.5);
     		hTFallCh[i] = new TH1F(Form("ch%03dTFall",i),"",timmax-timmin,timmin-0.5,timmax-0.5);
     		hTotCh[i] = new TH1F(Form("ch%03dTTot",i),"",400,-200.5,199.5); 
   	}
@@ -1192,6 +1200,8 @@ void TRich_Analysis::ProcessTDC(){
 							tothit++;				
 						
 							hTotCh[channel]->Fill(duration);
+	
+
 									
 						}
 					}
@@ -1225,6 +1235,9 @@ void TRich_Analysis::ProcessTDC(){
   	hEdgesD->Write();
   	hTRise->Write();
   	hTFall->Write();
+//hTRisevsTot->Write();
+//hTFallvsTot->Write();
+
 
   	delete hTRGtime;
   	delete hTRGfreq;
@@ -1232,6 +1245,8 @@ void TRich_Analysis::ProcessTDC(){
   	delete hEdgesD;
   	delete hTFall;
   	delete hTRise;
+//	delete hTFallvsTot;
+//	delete hTRisevsTot;
   
 	int histc = 0;
   	for (int i = 0; i<192; i++){
@@ -1249,9 +1264,26 @@ void TRich_Analysis::ProcessTDC(){
   	delete lfile;	
 	//printf("Analysis completed successfully\n");
 	printf("Histograms added %d to   %s \n",histc,fioTDCroot.c_str());
+
+*/
 }
 
-void 	TRich_Analysis::ProcessTDCTEMP(){ // BACK UP copy during sw update
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+void 	TRich_Analysis::ProcessTDCTEMP(){ // BACK UP copy during sw update	
+
 	printf("%s...\n",__FUNCTION__);
 	bool printEvents 			= false;
 	bool printEdges 			= false;
@@ -1263,13 +1295,12 @@ void 	TRich_Analysis::ProcessTDCTEMP(){ // BACK UP copy during sw update
   UInt_t thr 	= this->GetThreshold();	// get threshold from logbook (individual chip)
   UInt_t gain 	= this->GetGain();	// get gain from logbook (individual channel)
 
- // UInt_t lthreshold 	=  this->GetThreshold();
-  //UInt_t ltrigdly	= this->GetTriggerDelay();
- // UInt_t llookback	= this->GetEventBuilderLookBack();
+  UInt_t ltrigdly	= this->GetTriggerDelay();
+	UInt_t llookback	= this->GetEventBuilderLookBack();
   UInt_t lwindow	= this->GetEventBuilderWindow();
   lwindow = 8*lwindow; // in ns
   
-  /*
+  
     printf("Settings MAROC3:\n");
     
     printf("Threshold [DAC0 unit] = %d\n",thr);
@@ -1279,9 +1310,21 @@ void 	TRich_Analysis::ProcessTDCTEMP(){ // BACK UP copy during sw update
     printf("Trigger delay           =%5d -> %d*[8ns] = %5d [ns]\n",ltrigdly,ltrigdly,ltrigdly*8);  //128*8ns = 1024ns trigger delay
     printf("Event Builder LookBack  =%5d -> %d*[8ns] = %5d [ns]\n",llookback,llookback,llookback*8);
     printf("Event Builder Window	=%5d -> %d*[8ns] = %5d [ns]\n",lwindow,lwindow,lwindow*8);	
-  */
   
-  TFile * lfile = new TFile(fioTDCroot.c_str(),"UPDATE"); if(lfile->IsZombie()){printf("pFile is Zombie!\n");}
+  
+	TFile * lfile = new TFile(fioTDCroot.c_str(),"UPDATE"); 
+	
+	if (!lfile->IsOpen()) {
+		printf(" File %s not found, please call Ingest()\n",fioTDCroot.c_str());
+		return;
+		if(lfile->IsZombie()){
+			printf("pFile is Zombie!\n");
+		}
+	}else {
+		printf(" File %s opened\n",fioTDCroot.c_str());	
+	}
+
+
   TTree * ltree = (TTree*)lfile->Get("TDCdata"); // better using a macro in general header
   
   UInt_t lEventID	= 0; ltree->SetBranchAddress("triggerID",&lEventID);
@@ -1318,23 +1361,38 @@ void 	TRich_Analysis::ProcessTDCTEMP(){ // BACK UP copy during sw update
   TH1F * hTFall = new TH1F("hTFall","",timmax-timmin,timmin-0.5,timmax-0.5);
 
   hTRise->SetTitle("ASIC board - Edge Time Distribution");
-   
+  hTFall->SetTitle("ASIC board - Edge Time Distribution");
 
+  TH1F *  hTot = new TH1F("hTot","",500,-250.5,249.5); 
+   
+  TH2F * hTFallvsTot = new TH2F("hTFallvsTot","Charge Correlation with Falling Edge time",500,-250.5,249.5,timmax-timmin,timmin-0.5,timmax-0.5);
+  TH2F * hTRisevsTot = new TH2F("hTRisevsTot","Charge Correlation with Rising Edge time",500,-250.5,249.5,timmax-timmin,timmin-0.5,timmax-0.5);
+
+  //TH2F * hTFallvsTot = new TH2F("hTFallvsTot","Charge Correlation with Falling Edge time",90,-10.5,79.5,80,220-0.5,300-0.5);
+  //TH2F * hTRisevsTot = new TH2F("hTRisevsTot","Charge Correlation with Rising Edge time",90,-10.5,79.5,80,220-0.5,300-0.5);
+
+// Individual Channel
   TH1F * hTRiseCh[192]; 
   TH1F * hTFallCh[192];
   TH1F * hTotCh[192];
+  TH2F * hTRiseWalkCh[192];
+  TH2F * hTFallWalkCh[192];
 
-	// Individual Time response	
+	// focus on the region of interest (time and charge)
+	int ltmin = 200;
+	int ltmax = 350;
+	int ltotmin = -10; // must be negative!
+	int ltotmax = 80;	
 	for (int i=0; i<192; i++) {
-     // adc range adJustment		
-		int ltmin = 200;
-		int ltmax = 400;
-		
+
 		timmin = ltmin;
 		timmax = ltmax;
-    hTRiseCh[i] = new TH1F(Form("ch%03dTRise",i),"",timmax-timmin,timmin-0.5,timmax-0.5);
-    hTFallCh[i] = new TH1F(Form("ch%03dTFall",i),"",timmax-timmin,timmin-0.5,timmax-0.5);
-    hTotCh[i] = new TH1F(Form("ch%03dTFall",i),"",400,-200.5,199.5); 
+
+    hTRiseCh[i] 		= new TH1F(Form("ch%03dTRise",i),"",timmax-timmin,timmin-0.5,timmax-0.5);
+    hTFallCh[i] 		= new TH1F(Form("ch%03dTFall",i),"",timmax-timmin,timmin-0.5,timmax-0.5);
+    hTotCh[i] 			= new TH1F(Form("ch%03dTTot",i),"",500,-250.5,249.5); 
+    hTRiseWalkCh[i] = new TH2F(Form("ch%03dTRiseWalk",i),"",ltotmax-ltotmin,ltotmin-0.5,ltotmax-0.5,timmax-timmin,timmin-0.5,timmax-0.5);
+    hTFallWalkCh[i] = new TH2F(Form("ch%03dTFallWalk",i),"",ltotmax-ltotmin,ltotmin-0.5,ltotmax-0.5,timmax-timmin,timmin-0.5,timmax-0.5);
   }
   
   const int maxhit = 10000;  // a small value could create segmentation fault when analising runs with threshold  very close to pedestal
@@ -1351,6 +1409,8 @@ void 	TRich_Analysis::ProcessTDCTEMP(){ // BACK UP copy during sw update
 	// 3 Histograms as Channels summary
 	int nhisto = 9;
 	TH1F * hch[nhisto];
+
+	TH2F * hpx[nhisto];
 	
 	// 0 - Rise entries vs channel
 	// 1 - Fall entries vs channel
@@ -1364,20 +1424,21 @@ void 	TRich_Analysis::ProcessTDCTEMP(){ // BACK UP copy during sw update
 	// 7 - Duration Mean vs channel
 	// 8 - Duration RMS vs channel
 
-	for (int i=0; i<nhisto; i++) {hch[i] = new TH1F("","",192,-0.5,191.5);}
+	for (int i=0; i<nhisto; i++) {
+		hch[i] = new TH1F("","",200,-0.5,199.5);
+		hpx[i] = new TH2F("","",30,0,30,8,0,8);
 
 
+	}
 
-//printf(" Bin Size ********* hch **************** %lf\n",hch[2]->GetXaxis()->GetBinWidth(4));
-	
-  // Graphics output: create Canvas and open .pdf
+
 	
 	TCanvas* mycanv = new TCanvas("mycanv","",1280-2*SIZEOFCANV,0,2*SIZEOFCANV,SIZEOFCANV);
- // TCanvas* mycanv2 = new TCanvas("mycanv2","",1280-2*SIZEOFCANV,0,2*SIZEOFCANV,3*SIZEOFCANV);
+ 	// TCanvas* mycanv2 = new TCanvas("mycanv2","",1280-2*SIZEOFCANV,0,2*SIZEOFCANV,3*SIZEOFCANV);
   
-//	int n_asic = 2
-//	mycanv2->Divide(2,1);
-//	mycanv->cd();
+	//	int n_asic = 2
+	//	mycanv2->Divide(2,1);
+	//	mycanv->cd();
 	mycanv->Print(Form("%s[",fTDCpdf.c_str()));
 	
   // local variables for
@@ -1389,7 +1450,7 @@ void 	TRich_Analysis::ProcessTDCTEMP(){ // BACK UP copy during sw update
   int channel2;
   int hittime2;
   
-int duration; // time over threshold (tot)
+	int duration; // time over threshold (tot)
 	
 	// controlla chi e' piu grande tra totevents e max event e inizializza il ciclo for
   
@@ -1446,7 +1507,7 @@ int duration; // time over threshold (tot)
       channel = lchannel[i];
       hittime = ltime[i];
      
-			// Fill
+			//Fill
       switch (polar) {
       case 0:
 				hTRise->Fill(hittime);
@@ -1464,42 +1525,36 @@ int duration; // time over threshold (tot)
 			if(hitreconstruction){			// Hit Reconstruction
 				duration =0;
 				// look for the same channel with opposite polarity and calculate hit duration
- 				for (int j=i+1; j<(int)lnedge; j++) {
-				
+ 				for (int j=i+1; j<(int)lnedge; j++){
 					channel2 = lchannel[j];
-				
 					if(channel2==channel){
 						polar2 = lpolarity[j];
-					
 						if(polar2!=polar){
-						
 							hittime2 = ltime[j];	
-							if(polar2==1){
-								duration = hittime-hittime2;
-							}else{
-								duration = hittime2-hittime;
-							}
+							//if(channel==1){
+								if(polar2==1){ // secondo fall
+									duration = hittime-hittime2;	
+								}else{//	secondo e'un rise
+								
+									duration = hittime2-hittime;
+									hTFallvsTot->Fill(duration,hittime);
+									hTRisevsTot->Fill(duration,hittime2);
+									hTFallWalkCh[channel]->Fill(duration,hittime);
+									hTRiseWalkCh[channel]->Fill(duration,hittime2);
+								}
+							//}
 							//duration = hittime2-hittime;
-							
-								tothit++;				
+							tothit++;				
 						//	if(duration<0){
 						//		duration=-duration;
 						//	}
+							hTot->Fill(duration);
 							hTotCh[channel]->Fill(duration);		
-							/*switch(polar2){
-							case 0: printf("< "); break;
-							case 1: printf("> ");break;
-							default:break;
-							}		
-							printf("%4d   ",hittime2);
-							printf("duration = %3d [ns]",hittime2-hittime);
-						*/
 						}
 					}
 				}
-			}
-
-      if(printEdges){
+			}      
+			if(printEdges){
 				if(i==0){
 	  			printf("EDEGE LIST\t( Rise  = <  Fall = > )\n");
 				}
@@ -1515,16 +1570,12 @@ int duration; // time over threshold (tot)
 				printf("%4d  ",hittime);
 				printf("\n");	
       }	// end of if printf
-
-
-
-    } // end of loop on edgess
+    } // end of loop on edges
   } // end of loop on events
   
 	printf("HITS = %d\n",tothit);
 
   gStyle->SetOptStat(111111);	  
-
 
 	// Outputs and free memory
   
@@ -1587,14 +1638,77 @@ int duration; // time over threshold (tot)
   
   delete hTRise;
   delete hTFall;
-  
+
+
+  mycanv->cd(1)->SetLogy(1);
+  mycanv->cd(1)->SetLogx(0);
+	hTot->SetLineColor(kMagenta);
+
+  hTot->SetTitle("All channel Time Over Threshold");
+  hTot->GetXaxis()->SetTitle("Time Over Threshold [ns]");
+  hTot->GetYaxis()->SetTitle("Occourrency [#]");
+  hTot->Draw();
+  mycanv->Print(fTDCpdf.c_str());
+  hTot->Write();
+  delete hTot;
+
+
+	// Correlation with Rise
+
+	gStyle->SetOptStat(11111);
+
+  mycanv->cd(1)->SetLogy(0);
+  mycanv->cd(1)->SetLogx(0);
+  hTFallvsTot->SetTitle("Charge Correlation with Fall");
+  hTFallvsTot->GetXaxis()->SetTitle("Time over Threshold [ns]");
+  hTFallvsTot->GetYaxis()->SetTitle("Fall edge time [ns]");
+  hTFallvsTot->Draw();
+  mycanv->Print(fTDCpdf.c_str());
+  hTFallvsTot->Draw("COLZ");
+  mycanv->Print(fTDCpdf.c_str());	
+	hTFallvsTot->Write();
+	delete hTFallvsTot;
+
+
+	// Correlation with Rise
+  mycanv->cd(1)->SetLogy(0);
+  mycanv->cd(1)->SetLogx(0);
+  hTRisevsTot->SetTitle("Charge Correlation with Rise");
+  hTRisevsTot->GetXaxis()->SetTitle("Time over Threshold [ns]");
+  hTRisevsTot->GetYaxis()->SetTitle("Rising edge time [ns]");
+  hTRisevsTot->SetLineColor(kBlue);
+  hTRisevsTot->Draw();
+  mycanv->Print(fTDCpdf.c_str());
+  hTRisevsTot->Draw("COLZ");
+  mycanv->Print(fTDCpdf.c_str());
+  hTRisevsTot->Write();
+  delete hTRisevsTot;
+
   // Histograms are filled
   // Edge Time Distributuion (single channels)
 	
-bool enableSingleChannelprint = true;
+	bool enableSingleChannelprint = true;
+
+  TRich_Adapter adapter;
+	
+	int bin; 
+	int bin_offset;
+
+	int pixel;
+	int pixel_offset;
+
+	bool pixel_enable = true; // anodic view instead of electromnic channel
+	bool geo_enable = true; // mapmt view 2 D
+
+	int Xpix_offset;
+	int Ypix;
+	int Xpix;
+
 
   for (int i = 0; i<192; i++){
     
+		//if(i%64>=32){continue;}
+
     int Nrise = hTRiseCh[i]->GetEntries();
     int Nfall = hTFallCh[i]->GetEntries();
     int Nhit = hTotCh[i]->GetEntries();
@@ -1611,63 +1725,132 @@ bool enableSingleChannelprint = true;
     Double_t dtfall = hTFallCh[i]->GetRMS();
     Double_t dttot = hTotCh[i]->GetRMS();
     
-    hTRiseCh[i]->SetTitle(Form(" Test Pulse ASIC%d CH%2d - Rise Eff %.3lf -  THR %4d  GAIN %3d ",i/64,i%64,erise,thr,gain));
-    hTFallCh[i]->SetTitle(Form(" Test Pulse ASIC%d CH%2d - Fall Eff %.3lf -  THR %4d  GAIN %3d ",i/64,i%64,efall,thr,gain));
-    hTotCh[i]->SetTitle(Form(" Test Pulse ASIC%d CH%2d - Hit Eff %.3lf -  THR %4d  GAIN %3d ",i/64,i%64,ehit,thr,gain)); 
+    hTRiseCh[i]->SetTitle(Form(			" ASIC%d CH%2d - Pixel %d - Rise Eff %.3lf  -  THR %4d  GAIN %3d ",i/64,i%64,adapter.GetAnode(i%64),erise,thr,gain));
+    hTFallCh[i]->SetTitle(Form(			" ASIC%d CH%2d - Pixel %d - Fall Eff %.3lf  -  THR %4d  GAIN %3d ",i/64,i%64,adapter.GetAnode(i%64),efall,thr,gain));
+    hTotCh[i]->SetTitle(Form(				" ASIC%d CH%2d - Pixel %d - Hit Eff %.3lf   -  THR %4d  GAIN %3d ",i/64,i%64,adapter.GetAnode(i%64),ehit,thr,gain)); 
+		hTRiseWalkCh[i]->SetTitle(Form(	" ASIC%d CH%2d - Pixel %d - Rise Walk %.3lf -  THR %4d  GAIN %3d ",i/64,i%64,adapter.GetAnode(i%64),ehit,thr,gain)); 
+		hTFallWalkCh[i]->SetTitle(Form(	" ASIC%d CH%2d - Pixel %d - Fall Walk %.3lf -  THR %4d  GAIN %3d ",i/64,i%64,adapter.GetAnode(i%64),ehit,thr,gain)); 
 
-if(enableSingleChannelprint){
-    this->TDC_Draw(hTRiseCh[i],hTFallCh[i]);
-}
-    mycanv->cd(1)->SetLogy(1);
-    mycanv->cd(1)->SetGrid(1);
 
-   if(hTotCh[i]->GetEntries()){
-	hTotCh[i]->SetMaximum(100000);
+
+		if(enableSingleChannelprint){
+    	this->TDC_Draw(hTRiseCh[i],hTFallCh[i]);
+		}
+ 
+		mycanv->cd(1)->SetGrid(1);
+
+   	if(hTotCh[i]->GetEntries()){
+	  	mycanv->cd(1)->SetLogy(1);   
+			hTotCh[i]->SetMaximum(100000);
     	hTotCh[i]->SetMinimum(.1);
     	hTotCh[i]->SetLineColor(kMagenta);
-	hTotCh[i]->Draw();
-	if(enableSingleChannelprint){
-    
-		mycanv->Print(Form("%s",fTDCpdf.c_str()));
-	}		
-    	
-	
-	
-	
-	
-	}
-
-	
-   // if( Nrise && Nfall){ //
-		
-			hch[0]->Fill(i,erise);
-			hch[1]->Fill(i,efall);
-			hch[2]->Fill(i,trise);
-			hch[3]->Fill(i,tfall);			
-			hch[4]->Fill(i,dtrise);
-			hch[5]->Fill(i,dtfall);
-
-
-			hch[6]->Fill(i,ehit);
-			hch[7]->Fill(i,ttot);
-			hch[8]->Fill(i,dttot);
-			
-      hTRiseCh[i]->Write();
-      hTFallCh[i]->Write();
-      hTotCh[i]->Write();
-			
-			if (printStatistics) {
-				printf("CH_%d_%02d ",i/64,i%64); 
-				printf("RISE %5d %3.0lf%% delay %5.1lf[ns] tts %5.2lf[ns]  ",Nrise,erise*100,trise,dtrise); 
-		//		printf("        "); 
-				printf("FALL %5d %3.0lf%% delay %5.1lf[ns] tts %5.2lf[ns] ", Nfall,efall*100,tfall,dtfall);		
-
-				printf("WIDTH %5d %3.0lf%% delay %5.1lf[ns] tts %5.2lf[ns] ", Nhit,ehit*100,ttot,dttot);				
-				printf("\n");
+			hTotCh[i]->Draw();
+			if(enableSingleChannelprint){
+				mycanv->Print(Form("%s",fTDCpdf.c_str()));
 			}
-      if(hTRiseCh[i]){delete hTRiseCh[i];}
-      if(hTFallCh[i]){delete hTFallCh[i];}
-      if(hTotCh[i]){delete hTotCh[i];}
+			// Time Walk
+  		mycanv->cd(1)->SetLogy(0);
+			hTFallWalkCh[i]->Draw();
+			if(enableSingleChannelprint){
+				mycanv->Print(Form("%s",fTDCpdf.c_str()));
+			}
+			hTRiseWalkCh[i]->Draw();
+			if(enableSingleChannelprint){
+				mycanv->Print(Form("%s",fTDCpdf.c_str()));
+			}	
+		}
+
+   	// if( Nrise && Nfall){ //	 
+		
+		pixel = adapter.GetAnode(i%64);
+		pixel_offset = (i/64)*64;
+
+		//printf("channel %d -> anode %d ",i,pixel);
+		//printf("asic %d ->offset %d \n",i/64,pixel_offset)	;
+		
+		bin= i;		
+		bin_offset = 0;
+
+		// Pixel ID
+		if(pixel_enable){
+			bin = pixel;
+			bin_offset= pixel_offset;
+		}
+
+	 	hch[0]->Fill(bin+bin_offset,erise);		
+		hch[1]->Fill(bin+bin_offset,efall);
+		hch[2]->Fill(bin+bin_offset,trise);
+		hch[3]->Fill(bin+bin_offset,tfall);			
+		hch[4]->Fill(bin+bin_offset,dtrise);
+		hch[5]->Fill(bin+bin_offset,dtfall);
+		hch[6]->Fill(bin+bin_offset,ehit);
+		hch[7]->Fill(bin+bin_offset,ttot);
+		hch[8]->Fill(bin+bin_offset,dttot);
+
+		
+
+
+		
+		if(geo_enable){
+		//pixel [1..64] 
+			Xpix_offset = i/64*8;
+			Ypix =(pixel-1)/8;
+			Xpix = (pixel-1)%8;
+
+			printf("channel %3d pixel %2d Y %d X %d (%2d mapmt %d)\n",i,pixel,Ypix,Xpix,Xpix+Xpix_offset,i/64);
+		
+
+
+
+	 		hpx[0]->Fill(Xpix+Xpix_offset,Ypix,erise);		
+			hpx[1]->Fill(Xpix+Xpix_offset,Ypix,efall);
+			hpx[2]->Fill(Xpix+Xpix_offset,Ypix,trise);
+			hpx[3]->Fill(Xpix+Xpix_offset,Ypix,tfall);			
+			hpx[4]->Fill(Xpix+Xpix_offset,Ypix,dtrise);
+			hpx[5]->Fill(Xpix+Xpix_offset,Ypix,dtfall);
+			hpx[6]->Fill(Xpix+Xpix_offset,Ypix,ehit);
+			hpx[7]->Fill(Xpix+Xpix_offset,Ypix,ttot);
+			hpx[8]->Fill(Xpix+Xpix_offset,Ypix,dttot);
+
+			hpx[0]->SetTitle("Efficiency Rise");
+			hpx[1]->SetTitle("Efficiency Fall");
+			hpx[2]->SetTitle("Rise Time");
+			hpx[3]->SetTitle("Fall Time");
+			hpx[4]->SetTitle("Jitter Rise");
+			hpx[5]->SetTitle("Jitter Fall");
+			hpx[6]->SetTitle("Efficiency Time Over Threshold");
+			hpx[7]->SetTitle("Time Over THreshold (Charge)");
+			hpx[8]->SetTitle("Tot REsolution (Charge RMS)");
+
+
+			hpx[2]->SetMaximum(ltmax);
+			hpx[2]->SetMinimum(ltmin);
+			hpx[3]->SetMaximum(ltmax);
+			hpx[3]->SetMinimum(ltmin);
+
+		}
+
+  	hTRiseCh[i]->Write();
+  	hTFallCh[i]->Write();
+  	hTotCh[i]->Write();
+		hTFallWalkCh[i]->Write();
+		hTRiseWalkCh[i]->Write();
+			
+		if (printStatistics) {
+			printf("CH_%d_%02d ",i/64,i%64); 
+			printf("RISE %5d %3.0lf%% delay %5.1lf[ns] tts %5.2lf[ns]  ",Nrise,erise*100,trise,dtrise); 
+			//		printf("        "); 
+			printf("FALL %5d %3.0lf%% delay %5.1lf[ns] tts %5.2lf[ns] ", Nfall,efall*100,tfall,dtfall);		
+
+			printf("WIDTH %5d %3.0lf%% delay %5.1lf[ns] tts %5.2lf[ns] ", Nhit,ehit*100,ttot,dttot);				
+			printf("\n");
+		}
+    if(hTRiseCh[i]){delete hTRiseCh[i];}
+    if(hTFallCh[i]){delete hTFallCh[i];}
+    if(hTotCh[i]){delete hTotCh[i];}
+    if(hTRiseWalkCh[i]){delete hTRiseWalkCh[i];}
+    if(hTFallWalkCh[i]){delete hTFallWalkCh[i];}
+
     //}else {
 			//printf("Warning in %s: Edge distribution missing ch %d\n",__FUNCTION__,i);
 		//}
@@ -1682,7 +1865,11 @@ if(enableSingleChannelprint){
 	for (int i=0; i<nhisto; i++) {
 		if(hch[i]){
 			hch[i]->SetStats(0);
-			hch[i]->GetXaxis()->SetTitle("Channel [0..192]");
+			if(pixel_enable){
+				hch[i]->GetXaxis()->SetTitle("Pixel [0..63][0..63][0..63]");
+			}else{
+				hch[i]->GetXaxis()->SetTitle("Channel [0..192]");
+			}			
 			if(i%2==1&&i<6){
 				hch[i]->SetLineColor(kRed);
 			}
@@ -1698,6 +1885,7 @@ if(enableSingleChannelprint){
   hch[0]->SetTitle("Efficiency");
 	hch[0]->Draw();
 	hch[1]->Draw("SAME");
+
 
 	mycanv->Print(Form("%s",fTDCpdf.c_str()));
 	
@@ -1740,13 +1928,15 @@ if(enableSingleChannelprint){
 	mycanv->Print(Form("%s",fTDCpdf.c_str()));
 
 
-
-
-
-
 	for (int i=0; i<nhisto; i++) {
 		if(hch[i]){
 			delete hch[i];
+		}
+		if(hpx[i]){
+  gStyle->SetOptStat(0);	 
+			hpx[i]->Draw("COLZ");
+			mycanv->Print(Form("%s",fTDCpdf.c_str()));
+			delete hpx[i];
 		}
 	}
 	

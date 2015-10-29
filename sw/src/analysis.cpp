@@ -134,13 +134,15 @@ int main(int argc, char *argv[]){
 				break;
 			}
 
-			A.Ingest(); // parse .bin into root file
+				
+				
+				A.Ingest(); // parse .bin into root file
 
 			
 
 			if(A.SingleRun()){
-				A.ProcessTDC(); // new! man at work // add histogram to rootfile
-				//A.ProcessTDCTEMP();
+				//A.ProcessTDC(); // new! man at work // add histogram to rootfile
+				A.ProcessTDCTEMP();
 			}
 			if(A.Scan()){
 				A.ProcessTDCscan();

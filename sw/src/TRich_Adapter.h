@@ -26,7 +26,7 @@ private:
 public:
 	TRich_Adapter();
 	~TRich_Adapter();
-	unsigned char GetAnode(unsigned char maroc_channel);
+	unsigned char GetAnode(unsigned char maroc_channel);/* takes ch-0..63 and returns pixel ID [0..63]=*/ 
 private:
 	void CreateMap(); // draft/preliminary map (64 channels only)
 };
