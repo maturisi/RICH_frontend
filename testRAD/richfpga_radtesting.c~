@@ -13,7 +13,7 @@
 
 #define DEBUG_PRINT_VALS	
 
-extern RICH_regs *pRICH_regs;
+extern RICH_regs *pRICH_regs;s
 
 #define REG_TEST_LEN			1024
 unsigned int PreviousRegArray[REG_TEST_LEN];

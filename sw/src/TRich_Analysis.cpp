@@ -364,7 +364,7 @@ void TRich_Analysis::Ingest(){
 				gain = this->GetGain();
 				printf("GAIN %4d ",gain);
 				runID =r;
-				fTDCroot = "../data/parsed/" + frun_name + "_TDC" + ".root";
+				fTDCroot = "../../data/parsed/" + frun_name + "_TDC" + ".root";
 						
 				printf("fileroot[%3d] = %s ",r,fTDCroot.c_str());
 						
@@ -663,7 +663,7 @@ int	TRich_Analysis::NameRun(const char * fileraw,int runID_last,bool enablePrint
       
     case SINGLE_RUN:
       //printf(" SINGLE RUN");
-      fTDCroot = "../data/parsed/" + frun_name + "_TDC" + ".root";
+      fTDCroot = "../../data/parsed/" + frun_name + "_TDC" + ".root";
       fTDCpdf			= "../../pdf/" + frun_name +".pdf";
       
       
@@ -679,8 +679,8 @@ int	TRich_Analysis::NameRun(const char * fileraw,int runID_last,bool enablePrint
       
       sprintf(lnumstr, "_%06d",  runID_last);	
       
-      fTDCscanroot = "../data/parsed/" + frun_name + lnumstr + "_TDC" +"_SCAN"+ ".root";
-      fTDCscanpdf	= "../../pdf/" + frun_name + lnumstr + "_TDC" +"_SCAN"".pdf";
+      fTDCscanroot = "../../data/parsed/" + frun_name + lnumstr + "_TDC" +"_SCAN"+ ".root";
+      fTDCscanpdf	= "../../pdf/" + frun_name + lnumstr + "_TDC" +"_SCAN" +".pdf";
 
       break;
     default: 
@@ -692,7 +692,7 @@ int	TRich_Analysis::NameRun(const char * fileraw,int runID_last,bool enablePrint
     printf("Warning: Unknown daq mode\n"); 
     break;
   }
-  fioTDCroot = "../data/parsed/" + frun_name + "_TDC" + ".root";
+  fioTDCroot = "../../data/parsed/" + frun_name + "_TDC" + ".root";
   return 	frun_id;
 }
 
@@ -948,7 +948,7 @@ int	TRich_Analysis::TDC_Read(){
 		//puts( "File successfully deleted" );
 	}
 
-	printf("\nTree with parsed data %s\n",fioTDCroot.c_str());
+	printf("\nTree with data %s\n",fioTDCroot.c_str());
 
   return evtid; 
 }
@@ -2342,7 +2342,7 @@ bool laser = (strcmp("Laser", fsource.c_str()) == 0) ? true:false;
       }
     }
   }
-  mycanv->Print(Form("../pdf/%s_SKA_SingleChannel.pdf[",frun_prefix.c_str()));
+  mycanv->Print(Form("../../pdf/%s_SKA_SingleChannel.pdf[",frun_prefix.c_str()));
 
   gStyle->SetOptStat(0);
   for(channel=0;channel<192;channel++ ) {
@@ -2371,10 +2371,10 @@ bool laser = (strcmp("Laser", fsource.c_str()) == 0) ? true:false;
       h[channel]->SetMarkerStyle(1);
       h[channel]->Draw("E1");
       mycanv->cd(1)->SetGrid(1);
-      mycanv->Print(Form("../pdf/%s_SKA_SingleChannel.pdf",frun_prefix.c_str()));
+      mycanv->Print(Form("../../pdf/%s_SKA_SingleChannel.pdf",frun_prefix.c_str()));
     }
   }
- mycanv->Print(Form("../pdf/%s_SKA_SingleChannel.pdf]",frun_prefix.c_str()));
+ mycanv->Print(Form("../../pdf/%s_SKA_SingleChannel.pdf]",frun_prefix.c_str()));
 
   // clean up memory
   for (channel=0; channel<nch; channel++) {
@@ -2494,7 +2494,7 @@ bool laser = (strcmp("Laser", fsource.c_str()) == 0) ? true:false;
   h2->GetZaxis()->SetTitleOffset(1.6);	
   gPad->SetLeftMargin(0.15);
   gPad->SetRightMargin(0.22);	 
-  mycanv->Print(Form("../pdf/%s_SKA.pdf",frun_prefix.c_str()));
+  mycanv->Print(Form("../../pdf/%s_SKA.pdf",frun_prefix.c_str()));
   delete mycanv;
   lfile->Close();	
   delete lfile;

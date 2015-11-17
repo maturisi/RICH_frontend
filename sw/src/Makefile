@@ -1,6 +1,6 @@
 CC=g++
 CFLAGS= -Wall 
-LDFLAGS= -lconfig++  -L. -lmrc #-lrt 
+LDFLAGS= -lconfig++  -L. -lmrc -lrt 
 
 SOURCES= 	TRich_ConnectTCP.cpp \
 		TRich_Frontend.cpp \

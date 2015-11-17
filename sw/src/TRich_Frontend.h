@@ -1,9 +1,5 @@
 /*
  *  TRich_Frontend.h
- *  
- *
- *  Created by Matteo Turisini on 19/03/15.
- *  Copyright 2015 __MyCompanyName__. All rights reserved.
  *
  */
 
@@ -15,12 +11,6 @@
 #include "TRich_Config.h"
 
 #define MAROC_NUM 2
-
-
-//#define MRC_RUN_NUMBER_FILE	 "cfg/last.run"
-//#define DEFAULT_CONFIG_FNAME	"./maroc.cfg"
-
-#define OUT_PATH "../data/out/"
 
 #define SUFFIX_RAW_DATA ".txt"
 #define SUFFIX_LOG ".log"

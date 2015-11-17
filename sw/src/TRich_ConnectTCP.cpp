@@ -36,7 +36,7 @@ int TRich_ConnectTCP::Receive(int * valp){
 	//printf(" TCP Receive  %d bytes (%d expected) content is %ld (0x%X)\n",n,sizeof(val),val,val);
   *valp = val;
   //printf(" TCP Receive 0x%X  and pass 0x%X \n",val,*valp);
-/*
+
 	if(n< 0){     
 //	if ((err == EAGAIN) || (err == EWOULDBLOCK))
   	
@@ -50,7 +50,7 @@ int TRich_ConnectTCP::Receive(int * valp){
          // break;
        }
     }        
-*/
+
 return n;
 }
 

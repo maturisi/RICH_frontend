@@ -1126,7 +1126,7 @@ void	TRich_Config::Export(string filename){
 	string lfn = filename;
 	fcfg.setTabWidth(TABWIDTH);
 	fcfg.writeFile(lfn.c_str());
-	printf("Configuration successfully written to %s\n",lfn.c_str());
+	printf("Logbook successfully written to %s\n",lfn.c_str());
 
 }
 int TRich_Config::GetLogNEvents(){

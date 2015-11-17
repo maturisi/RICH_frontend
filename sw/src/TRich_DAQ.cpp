@@ -12,91 +12,105 @@
 #include <signal.h>	// SIGINT, signal
 #include <time.h>       /* time_t, struct tm, time, localtime */
 #include <stdint.h>  
+#include <unistd.h> //usleep
+
 
 #include "TRich_DAQ.h"
 
+#define MRC_RUN_NUMBER_FILE	 	"../cfg/last.run"
+#define OUT_PATH 							"../../data/out/"
+#define MODE_SCALER						0
+#define MODE_TDC							1
+
+
 /* Signal Handling*/
 static int sig_int=1;
-void ctrl_c(int){
+void ctrl_c(int){ 
 	sig_int =0;
 	printf("\n CTRL-C pressed\n\r");
 }
 
 
-/* TRich_DAQ class*/
-TRich_DAQ::TRich_DAQ(){
-		
+TRich_DAQ::TRich_DAQ()
+{		
 	fcfg = NULL;
 	ffe = NULL ;
-nmeas =0;
+	nmeas =0;
 	fprogress_old=0;
+}
+
+TRich_DAQ::~TRich_DAQ()
+{
 
 }
 
-
-TRich_DAQ::~TRich_DAQ(){
-}
-
-
- 
-void TRich_DAQ::SetFrontend(TRich_Frontend * fe){
+void TRich_DAQ::SetFrontend(TRich_Frontend * fe)
+{
   if ( fe==NULL) {cout << "Warning: NO front end"<<endl;}
   ffe = fe ;   
 }
-void TRich_DAQ::SetConfiguration(TRich_Config * cfg){
+
+void TRich_DAQ::SetConfiguration(TRich_Config * cfg)
+{
   if (cfg==NULL) {cout << "Warning: NO configuration"<<endl;}	
   fcfg = cfg;	
 }
 
-
-/*time in nanosecond in POSIX systems*/
-
-void 	TRich_DAQ::TimeStart(){
+std::string TRich_DAQ::TimeString()
+{
+	time_t	ltref;	
 	
+	time(&ltref);
+	
+	struct tm * ltim = localtime(&ltref); 
+
+	std::string dateStr =  asctime(ltim);
+
+	return dateStr;
+}
+
+void TRich_DAQ::PreEv()
+{
+	fraw = this->OpenOutFile(fcfg->RunPrefix());
+	
+	printf ("Date: %s", this->TimeString().c_str());
+
+	this->TimeStart();
+}
+
+
+
+void 	TRich_DAQ::TimeStart()
+{
 #if __APPLE__	
   printf("I am on Mac OsX\n");
   //*pt = mach_absolute_time();// pt is a uint64_t
 #else
-  //	printf("I am on Linux\n");
-
-	uint64_t t;
-	uint64_t t_ns;
-
 	clock_gettime(CLOCK_REALTIME,&fstart);
-//	printf("Time Start is %ld sec + %ld nsecond\n",fstart.tv_sec,fstart.tv_nsec);
-
- 	t = fstart.tv_sec;
- 	t_ns = fstart.tv_nsec;
-//	printf("Time Start: %12ld sec + %12ld nsecond\n",t,t_ns);
-
-
 #endif
-
 }
-float 	TRich_DAQ::TimeNow(){
 
 
-float lduration = 0.0;
-nmeas++;
-
+float 	TRich_DAQ::TimeNow()
+{
+	float lduration = 0.0;
+	nmeas++;
 #if __APPLE__
 	printf("I am on Mac OsX\n");
-#else
-	//	printf("I am on Linux\n");
+#else // linux
 
-	uint64_t t;
-	uint64_t t_ns;
 	timespec mark1;
-	
 	clock_gettime(CLOCK_REALTIME,&mark1);
 
- 	t = mark1.tv_sec;
- 	t_ns = mark1.tv_nsec;
-  //printf("Time Now  : %12ld sec + %12ld nsecond ",t,t_ns);
+	uint64_t t = mark1.tv_sec;
+	uint64_t t_ns = mark1.tv_nsec;
 
+  //printf("Time Now  : %12ld sec + %12ld nsecond ",t,t_ns);
 
 	uint64_t duration;
 	uint64_t duration_ns; 
+
+	uint64_t giga = 1000000000; // 10^9
 
 	if(t_ns>(uint64_t)fstart.tv_nsec){
 		duration = t - fstart.tv_sec;
@@ -104,123 +118,90 @@ nmeas++;
 
 	}else{
 		duration = t - fstart.tv_sec-1;
-		duration_ns = GIGA + t_ns -fstart.tv_nsec; 
+		duration_ns = giga + t_ns -fstart.tv_nsec; 
 	}
 
-//	printf("Duration  : %12ld sec + %12ld nsecond\n",duration,duration_ns);
-//	printf("Time Now  : %12ld sec + %12ld nsecond\n",duration,duration_ns);
+//	printf("Duration  : %12ld sec + %12ld nsecond\n",__FUNCTION__,duration,duration_ns);
+//	printf("%s : %12ld sec + %12ld nsecond\n",__FUNCTION__,duration,duration_ns);
 
-	lduration = (float)duration + ((float) duration_ns)/GIGA; 
+	lduration = (float)duration + ((float) duration_ns)/giga; 
 
-//printf("%d %lf\n",nmeas,fduration);
- 
+//	printf("%6d %.9lf\n",nmeas,lduration); 
 #endif
-	
-
-return lduration;
+	return lduration;
 	
 }
 
 
-/*date and hour */
 
-string TRich_DAQ::TimeString(){
-
-	time_t	ltref;	
-	time(&ltref);
-	struct tm * ltim = localtime(&ltref);
-	//printf ("Current time and date: %s", asctime(ltim));
-
-	string dateStr =  asctime(ltim);
-	//printf ("Current time and date: %s", dateStr.c_str());
-
-	return dateStr;
-}
-
-void TRich_DAQ::PreEv(){
-
-	// open outfile
-	fraw = this->OpenOutFile(fcfg->RunPrefix());
-	
-	// print date on screen
-	printf ("Date: %s", this->TimeString().c_str());// time and date
-
-	this->TimeStart();
-}
 
 
 long long  TRich_DAQ::DoEv(int verbosity){
 		
   signal(SIGINT,ctrl_c); // if receives ctrl-c from the keyboard execute ctrl_c
-	
-  //unsigned int gBuf[1000000]; //obsolete
-  
-  int val = 0;
-  //int nevts = 0;
-  //int poll = 0;
- // int evt=0;
- // int operationID =0;
-  
+
 	// read DAQ settings
-  int mode	   	= fcfg->Daq_Mode();
+  int mode	   			= fcfg->Daq_Mode();
   int event_preset 	= fcfg->EventPreset() ;
   int time_preset  	= fcfg->TimePreset(); 
   int iteration    	= fcfg->ScalerRepetition();
   int duration    	= fcfg->ScalerDuration();
   
-  // new TDC socket
+
   int n;
   long long nevents=0; 
   long long  nbytes = 0;
   long long dbytes = 0;;
 
- // int dummy=0;
+  int val = 0;
+
 
   ffe->StartDAQ();
-  
+ 
   switch(mode){
 
   case MODE_TDC:
-  //  nevents = 0;
-  //  nbytes = 0;
-  //  dbytes = 0;
     printf("RICH - waiting for TDC event data...current run will end in %d seconds or press ctrl-c\n",time_preset );
-
     do{
+
       n = ffe->Receive(&val);
-     
-			if((val==0)||(n==-1)){
-		//		printf("Received nothing\n");
+/*
+			 // debug
+			if((val==0)||(n==-1))
+			{
+				printf("Received nothing\n");
 				continue;
 			}else{
-	//			printf("Received %d bytes, val = 0x%X\n",n,val);
+				printf("Received %d bytes, val = 0x%X\n",n,val);
 			}
-
-			//if(((val & 0xF8000000) == 0x90000000)&&(nevents>=event_preset)){
-				//	printf("HEADER found\n");			
-				//break;
-      //}
-     
+*/
+/*
+			if(((val & 0xF8000000) == 0x90000000)&&(nevents>=event_preset)){
+				printf("HEADER found\n");			
+				break;
+      }
+*/   
 		 fwrite(&val, sizeof(val), 1, fraw);
-     
-      nbytes+= sizeof(val);
-      dbytes+= sizeof(val);
+    
+		 fduration = this->TimeNow();
       
-      if((val & 0xF8000000) == 0x90000000){
+			nbytes+= sizeof(val);
+      dbytes+= sizeof(val);
+
+      if((val & 0xF8000000) == 0x90000000)
+			{
 				nevents++;
 				//ProgressBar();			
-				
-			if(!(nevents % ((long long)(event_preset/10.)))){
-	    
-				printf("[0x%08X] nevents = %lld, nbytes = %lld, dbytes = %lld\n", val, nevents, nbytes, dbytes);
-	    		fflush(stdout);
-	   			dbytes = 0;     
-	 		 }
-
-      }
-      fduration = this->TimeNow(); 
+				if(!(nevents % ((long long)(event_preset/10.))))
+				{
+//	    		printf("[0x%08X] nevents = %lld, nbytes = %lld, dbytes = %lld, duration %lf \n", val, nevents, nbytes, dbytes,fduration);
+		    		printf("[0x%08X] nevents = %8lld, Rate =%.1lf kevts/s, %.1lf MB/s\n", val, nevents, 0.001*nevents/fduration,0.000001*nbytes/fduration);
+						fflush(stdout);
+	   				dbytes = 0;     
+	 		 	}
+      }       
     }while(fduration<time_preset&&sig_int&&nevents<=event_preset);	  
-    
+
     break;
     
   case MODE_SCALER:
@@ -243,35 +224,32 @@ long long  TRich_DAQ::DoEv(int verbosity){
     break;
   }
   printf("\n");	
-  
-	fduration = this->TimeNow();
-
 	fnevts= nevents;
-
-
-
 	return nevents;
 }
+
 
 void TRich_DAQ::PostEv(){
 
 	fclose(fraw);
 
+	printf("DAQ Completed :\n");
 	printf ("Date         : %s", this->TimeString().c_str());// time and date
-  	printf("Events[#]     : %6d \n",fnevts);
+  printf("Events[#]     : %6d \n",fnevts);
 	printf("Duration [s]  : %6.3lf\n",fduration);
 	printf("Rate [evts/s] : %6.0lf\n",fnevts/fduration);
-	printf("DAQ Completed and data successfully written to %s \n",frunName.c_str());
 
+	printf("Data successfully written to %s \n",this->GetRunName().c_str());
 
-	// daq statistics are exported
   fcfg->Logbook("Events",fnevts);
   fcfg->Logbook("Duration",fduration);
-	fcfg->Export(flogName.c_str());
+	fcfg->Export(this->GetLogName().c_str());
 }
 
 
 void  	TRich_DAQ::ProgressBar(){
+
+	int step = 20;
 
   int event_preset 	= fcfg->EventPreset() ;
   int time_preset  	= fcfg->TimePreset(); 
@@ -279,20 +257,20 @@ void  	TRich_DAQ::ProgressBar(){
 	//printf("Durata attuale %lf ",fduration);
 	//printf("preset tempo %d ",time_preset);
 	//printf("ratio  %lf\n",fduration/time_preset);
-	//printf("ratio x step  %lf\n",(fduration/time_preset)*PROGRESS_STEP);
+	//printf("ratio x step  %lf\n",(fduration/time_preset)*step);
 
-	int progress_time = (fduration/time_preset)*PROGRESS_STEP; 
+	int progress_time = (fduration/time_preset)*step; 
 	
 	//printf("Eventi Attuali %d ",fnevts);
 	//printf("preset eventi  %d ",event_preset);
 	//printf("ratio evt %lf\n",((float)fnevts)/event_preset);
-	//printf("ratio evt x step  %lf\n",(fnevts/event_preset)*PROGRESS_STEP);
+	//printf("ratio evt x step  %lf\n",(fnevts/event_preset)*step);
 
-	int progress_evt = (((float) fnevts)/event_preset)*PROGRESS_STEP;
+	int progress_evt = (((float) fnevts)/event_preset)*step;
 	
 	int progress = progress_time > progress_evt ? progress_time : progress_evt;
 
-	progress = progress < PROGRESS_STEP ? progress : PROGRESS_STEP;
+	progress = progress < step ? progress : step;
 
 	//printf("progress time %d\n",progress_time);
 	//printf("progress evt  %d\n",progress_evt);
@@ -309,14 +287,14 @@ void  	TRich_DAQ::ProgressBar(){
 		fflush(stdout);
 	}
 	
-	if (progress == PROGRESS_STEP){} // 
+	if (progress == step){} // 
 	fprogress_old = progress;
 
 }
 
 
-string TRich_DAQ::GetRunName(){return frunName;}
-string TRich_DAQ::GetLogName(){return flogName;}
+std::string TRich_DAQ::GetRunName(){return frunName;}
+std::string TRich_DAQ::GetLogName(){return flogName;}
 
 
 int TRich_DAQ::ReadRunNum(){
@@ -346,7 +324,15 @@ int TRich_DAQ::WriteRunNum(int rr){
 }
 FILE * TRich_DAQ::OpenOutFile(std::string file_prefix){
 
-	
+  int mode = fcfg->Daq_Mode();	
+
+	std::string suffix = ".bin";
+	if(mode!=MODE_TDC)
+	{
+		suffix = ".txt";  
+	}
+
+
 	FILE *fp;	
 	int irun = this->ReadRunNum()+1;
 	this->WriteRunNum(irun);
@@ -359,33 +345,20 @@ FILE * TRich_DAQ::OpenOutFile(std::string file_prefix){
 	frunName += OUT_PATH;
 	frunName += file_prefix;	
 	frunName += numstr;
-	frunName += SUFFIX_RAW;
-	
+	frunName += suffix;
+//frunName += ".bin";
+		
+
 	// logbook output file 
 	flogName.clear();
 	flogName += OUT_PATH;
 	flogName += file_prefix;	
 	flogName += numstr;
-	flogName += SUFFIX_LOG;
-
-	// plain text output file
-	
-	ftxtName.clear();
-	ftxtName += OUT_PATH;
-	ftxtName += file_prefix;	
-	ftxtName += numstr;
-	ftxtName += SUFFIX_TXT;
-	
+	flogName += ".log";
 	
 	if ( (fp=fopen(frunName.c_str(), "wb")) == NULL ){
 		printf("Cannot open output file %s\n",frunName.c_str());
 		return NULL;
 	}
-/*
-	printf("Binary file %s\n",frunName.c_str());
-	printf("Logbookfile %s\n",flogName.c_str());
-	printf("Text   file %s\n",ftxtName.c_str());
-	*/
 	return fp;
-	
 }
