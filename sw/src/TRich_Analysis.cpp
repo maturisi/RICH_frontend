@@ -1272,16 +1272,6 @@ hTRiseCh[i] = new TH1F(Form("ch%03dTRise",i),"",timmax-timmin,timmin-0.5,timmax-
 
 
 
-
-
-
-
-
-
-
-
-
-
 void 	TRich_Analysis::ProcessTDCTEMP(){ // BACK UP copy during sw update	
 
 	printf("%s...\n",__FUNCTION__);
@@ -1338,7 +1328,7 @@ void 	TRich_Analysis::ProcessTDCTEMP(){ // BACK UP copy during sw update
   
   int maxHz = 1000*1000; // 1 MHz
  // int maxEdges = 3*4*64; // max 4 edges/channel per trigger (at the baseline is Billions but they will go in overflow bin)
- int maxEdges = 64; // max 4 edges/channel per trigger (at the baseline is Billions but they will go in overflow bin)
+ int maxEdges = 128; // max 4 edges/channel per trigger (at the baseline is Billions but they will go in overflow bin)
     
 
   int totEvts = ltree->GetEntries();

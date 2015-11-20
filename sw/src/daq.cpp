@@ -8,6 +8,7 @@
 #include "TRich_Config.h"
 #include "TRich_Frontend.h"
 #include "TRich_DAQ.h"
+#include <unistd.h> // sleep
 
 #define IPADDRESS "192.168.1.10"
 #define PORT_REGISTERS 6102 
@@ -44,21 +45,21 @@ int main(int argc, char *argv[]){
   fe.SetTCP(&tcp);
   fe.SetConfiguration(&cfg);
   fe.ConfigureMAROC();
-  fe.ConfigureFPGA();			
+  fe.ConfigureFPGA();		
 
   success = tcp.OpenSocket_Event(IPADDRESS,PORT_EVENTS);
   
   if(!success){printf("Event Socket not openend...exit\n");
     return -3;
   }
-  
+ 
   TRich_DAQ daq;
   daq.SetFrontend(&fe); 
   daq.SetConfiguration(&cfg);
-  daq.PreEv();
-  daq.DoEv(0);
+ 	daq.PreEv();
+ 	daq.DoEv(0);
   daq.PostEv();
- 
+
   success = tcp.CloseSocket_Event();
   if(!success){printf("Event Socket not closed...exit\n");
     return -4;

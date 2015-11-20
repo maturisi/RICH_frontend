@@ -11,7 +11,7 @@
 #include <arpa/inet.h> 
 #include "richfpga_io.h"
 
-#define DEBUG_PRINT_VALS	
+#define DEBUG_PRINT_VALS	0
 
 extern RICH_regs *pRICH_regs;
 
@@ -236,6 +236,24 @@ void rich_RadTest_Init()
 	rich_RadTest_ReadReg(PreviousRegArray);
 	rich_RadTest_ReadBram(PreviousBramArray);
 	rich_RadTest_ReadSpi(PreviousSpiArray);
+
+	int i;
+	for(i = 0; i < REG_TEST_LEN; i++)
+	{
+		printf(" %d 0x%X \n",i,PreviousRegArray[i]);
+		 
+	}
+
+	for(i = 0; i < BRAM_TEST_LEN; i++)
+	{
+		printf(" %d 0x%X \n",i,PreviousBramArray[i]);		 
+	}
+
+
+
+
+
+
 }
 
 

@@ -8,9 +8,10 @@
  */
 
 #include <stdio.h> // printf
+#include <time.h>       /* time_t, struct tm, time, localtime */
+
 #include <iostream> // cerr, endl
 #include <signal.h>	// SIGINT, signal
-#include <time.h>       /* time_t, struct tm, time, localtime */
 #include <stdint.h>  
 #include <unistd.h> //usleep
 
@@ -21,6 +22,7 @@
 #define OUT_PATH 							"../../data/out/"
 #define MODE_SCALER						0
 #define MODE_TDC							1
+#define MODE_REGISTER_TEST		2
 
 
 /* Signal Handling*/
@@ -56,13 +58,26 @@ void TRich_DAQ::SetConfiguration(TRich_Config * cfg)
   fcfg = cfg;	
 }
 
+
+long TRich_DAQ::TimeEpoch()
+{
+	time_t sec;	
+	
+	time(&sec);
+
+	//printf(" %ld seconds since epoch\n",(long)sec);
+	
+	return (long) sec;
+}
+
+
 std::string TRich_DAQ::TimeString()
 {
-	time_t	ltref;	
+	time_t	sec;	
 	
-	time(&ltref);
+	time(&sec);
 	
-	struct tm * ltim = localtime(&ltref); 
+	struct tm * ltim = localtime(&sec); 
 
 	std::string dateStr =  asctime(ltim);
 
@@ -110,7 +125,10 @@ float 	TRich_DAQ::TimeNow()
 	uint64_t duration;
 	uint64_t duration_ns; 
 
-	uint64_t giga = 1000000000; // 10^9
+//	uint64_t giga = 1000000000; 
+uint64_t giga = 10.0E9; 
+
+
 
 	if(t_ns>(uint64_t)fstart.tv_nsec){
 		duration = t - fstart.tv_sec;
@@ -126,7 +144,7 @@ float 	TRich_DAQ::TimeNow()
 
 	lduration = (float)duration + ((float) duration_ns)/giga; 
 
-//	printf("%6d %.9lf\n",nmeas,lduration); 
+	//printf("%6d %.9lf\n",nmeas,lduration); 
 #endif
 	return lduration;
 	
@@ -155,10 +173,53 @@ long long  TRich_DAQ::DoEv(int verbosity){
 
   int val = 0;
 
+	long sec;
+	int err;
 
   ffe->StartDAQ();
  
   switch(mode){
+
+	case MODE_REGISTER_TEST:
+	
+		printf("TEST REGISTER: cycles %d [#], pause %d [s] \n",iteration,duration);
+
+		for(int i=0;i<iteration;i++ )
+		{
+			nevents++;
+			sec = this->TimeEpoch();		
+			err = ffe->CheckMAROC();		
+
+			printf("%lld) TIME EPOCH %ld MAROC ERRORS %d\n",nevents,sec,err);	
+			if(err){fprintf(fraw, "%ld %d\n",sec,err);}
+
+			if(i%10==5)
+			{
+				ffe->InjErrors();
+			}
+			if(sig_int==0){break;} 
+			
+			//usleep(duration*1000); // duration in milli seconds
+			sleep(duration); // duration in seconds
+		}
+
+		break;
+
+	case MODE_SCALER:
+    
+		printf("SCALER: Duration %d seconds, repetition %d \n",duration,iteration);
+		ffe->DumpScalers(); // first measure skipped
+
+		for(int i=0;i<iteration;i++) {
+			
+			sleep(duration);
+			nevents += ffe->DumpScalers(fraw,true);
+
+			// estrarre valori medi scalers asic 0, 1, 2!!
+			if(sig_int==0){break;} 
+		}
+		break;
+
 
   case MODE_TDC:
     printf("RICH - waiting for TDC event data...current run will end in %d seconds or press ctrl-c\n",time_preset );
@@ -204,25 +265,14 @@ long long  TRich_DAQ::DoEv(int verbosity){
 
     break;
     
-  case MODE_SCALER:
-    
-		printf("SCALER: Duration %d seconds, repetition %d \n",duration,iteration);
-		ffe->DumpScalers(); // first measure skipped
+  
 
-		for(int i=0;i<iteration;i++) {
-			
-			sleep(duration);
-			nevents += ffe->DumpScalers(fraw,true);
-
-			// estrarre valori medi scalers asic 0, 1, 2!!
-			if(sig_int==0){break;} 
-		}
-		break;
 	    
   default: 
-    printf("Unknown DAQ mode, please use 0 for scalers, 1 for TDC\n");
+    printf("Unknown DAQ mode, please use 0 for scalers, 1 for TDC,2 for Slow Control Bit Flip Search\n");
     break;
   }
+		 fduration = this->TimeNow();
   printf("\n");	
 	fnevts= nevents;
 	return nevents;
@@ -238,11 +288,15 @@ void TRich_DAQ::PostEv(){
   printf("Events[#]     : %6d \n",fnevts);
 	printf("Duration [s]  : %6.3lf\n",fduration);
 	printf("Rate [evts/s] : %6.0lf\n",fnevts/fduration);
-
 	printf("Data successfully written to %s \n",this->GetRunName().c_str());
 
+
+	printf("LOG FILE %s\n",this->GetLogName().c_str());
   fcfg->Logbook("Events",fnevts);
   fcfg->Logbook("Duration",fduration);
+
+	//fcfg->Print();
+
 	fcfg->Export(this->GetLogName().c_str());
 }
 

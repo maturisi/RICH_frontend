@@ -114,18 +114,18 @@ typedef struct
 		unsigned int val;
 		struct
 		{
-			unsigned int cmd_fsu		: 1;
-			unsigned int cmd_ss		: 1;
-			unsigned int cmd_fsb		: 1;
+			unsigned int cmd_fsu			: 1;
+			unsigned int cmd_ss				: 1;
+			unsigned int cmd_fsb			: 1;
 			unsigned int swb_buf_250f	: 1;
 			unsigned int swb_buf_500f	: 1;
 			unsigned int swb_buf_1p		: 1;
 			unsigned int swb_buf_2p		: 1;
-			unsigned int ONOFF_ss		: 1;
+			unsigned int ONOFF_ss			: 1;
 			unsigned int sw_ss_300f		: 1;
 			unsigned int sw_ss_600f		: 1;
 			unsigned int sw_ss_1200f	: 1;
-			unsigned int EN_ADC		: 1;
+			unsigned int EN_ADC				: 1;
 			unsigned int H1H2_choice	: 1;
 			unsigned int sw_fsu_20f		: 1;
 			unsigned int sw_fsu_40f		: 1;
@@ -142,10 +142,10 @@ typedef struct
 			unsigned int sw_fsb2_100k	: 1;
 			unsigned int sw_fsb2_100f	: 1;
 			unsigned int sw_fsb2_50f	: 1;
-			unsigned int valid_dc_fsb2	: 1;
+			unsigned int valid_dc_fsb2: 1;
 			unsigned int ENb_tristate	: 1;
 			unsigned int polar_discri	: 1;
-			unsigned int inv_discriADC	: 1;
+			unsigned int inv_discriADC: 1;
 		} bits;
 	} Global0;
 	
@@ -154,7 +154,7 @@ typedef struct
 		unsigned int val;
 		struct
 		{
-			unsigned int d1_d2		: 1;
+			unsigned int d1_d2				: 1;
 			unsigned int cmd_CK_mux		: 1;
 			unsigned int ONOFF_otabg	: 1;
 			unsigned int ONOFF_dac		: 1;
@@ -172,10 +172,10 @@ typedef struct
 		unsigned int val;
 		struct
 		{
-			unsigned int DAC0		: 10;
-			unsigned int Reserved0		: 6;
-			unsigned int DAC1		: 10;
-			unsigned int Reserved1		: 6;
+			unsigned int DAC0				: 10;
+			unsigned int Reserved0	: 6;
+			unsigned int DAC1				: 10;
+			unsigned int Reserved1	: 6;
 		} bits;
 	} DAC;
 	
@@ -187,15 +187,15 @@ typedef struct
 		struct
 		{
 			unsigned int Gain0		: 8;
-			unsigned int Sum0		: 1;
+			unsigned int Sum0			: 1;
 			unsigned int CTest0		: 1;
-			unsigned int MaskOr0		: 2;
-			unsigned int Reserved0		: 4;
+			unsigned int MaskOr0	: 2;
+			unsigned int Reserved0: 4;
 			unsigned int Gain1		: 8;
-			unsigned int Sum1		: 1;
+			unsigned int Sum1			: 1;
 			unsigned int CTest1		: 1;
-			unsigned int MaskOr1		: 2;
-			unsigned int Reserved1		: 4;
+			unsigned int MaskOr1	: 2;
+			unsigned int Reserved1: 4;
 		} bits;
 	} CH[32];
 	

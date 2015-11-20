@@ -1170,17 +1170,15 @@ int main(int argc, char *argv[])
 
 	open_register_socket();
 
-/*
+
 	rich_RadTest_Init();
-	
-	
 	
 	while(1)
 	{
 		sleep(10);
 		rich_RadTest_UpdateCounters();
 	}
-*/	
+
 
 	rich_test_regs();
 	
