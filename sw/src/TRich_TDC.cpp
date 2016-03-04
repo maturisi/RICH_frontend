@@ -11,12 +11,17 @@
 	
 TRich_TDC::TRich_TDC(const char * outname)
 {
+	Reset();
 
 	ftotEvents = 0;
-	Reset();
+
+	ffile= NULL;
+	ftree = NULL;
 	
+
+	// Initialize the ROOT file and ROOT tree
 	if (!outname) {
-		printf("Warning: arg is empty, no root will be created\n");
+		//printf("Warning: arg is empty, no root will be created\n");
 	}else {
 		
 		ffile= new TFile(outname, "RECREATE"); if(ffile->IsZombie()){printf("%s is Zombie!\n",outname);}
@@ -36,11 +41,15 @@ TRich_TDC::TRich_TDC(const char * outname)
 
 TRich_TDC::~TRich_TDC()
 {
-	ftree->Write(); //ftree->Print();//ftree->Scan();
-	delete ftree;
 
-	ffile->Close();
-	delete ffile;
+	if(ftree) delete ftree;
+
+	if(ffile->IsOpen()){ffile->Close();delete ffile;}
+
+}
+
+void	TRich_TDC::Write(){
+	ftree->Write(); 
 
 }
 
@@ -106,6 +115,7 @@ void TRich_TDC::Reset()
 }
 
 double TRich_TDC::DecodeTimeStamp(){
+	
 	uint64_t ltstamp1 = fts1;
 	uint64_t ltstamp0 = fts0;
 	
@@ -118,6 +128,9 @@ double TRich_TDC::DecodeTimeStamp(){
 	return fts_sec;
 }
 
+
+
+
 void TRich_TDC::Edge(unsigned int chan,unsigned int time, unsigned int edge){
 	
 	RICH_tdc_edge_t lEdge;
@@ -128,12 +141,19 @@ void TRich_TDC::Edge(unsigned int chan,unsigned int time, unsigned int edge){
 	
 	// add it to the list
 	fEdgeList.push_back(lEdge);
-	
+
+	// debug
 	//printf("(%d ,%d, %d)\n",lEdge.chan,lEdge.time,lEdge.edge);
 	//std::cout << "size: " << (int) fEdgeList.size() << '\n';
 	//std::cout << "capacity: " << (int) fEdgeList.capacity() << '\n';
 	//std::cout << "max_size: " << (unsigned int) fEdgeList.max_size() << '\n';
-	
+
+
+	// update nedge for this event
+	int size = (int)fEdgeList.size();
+  fnedge = (UInt_t)size;
+
+	// update pos/neg edge counters	for this event
 	switch (edge) {
 		case 0:fposc++;break;	
 		case 1:fnegc++;break;
@@ -144,6 +164,119 @@ void TRich_TDC::Edge(unsigned int chan,unsigned int time, unsigned int edge){
 }
 
 
+void	TRich_TDC::Print(	int verbosity, unsigned int channel){
+
+	if (verbosity == 0) return;
+
+	this->DecodeTimeStamp(); // set fts_sec
+
+	printf("EventID=%d ",ftid);
+  printf("TIME=%lf ",fts_sec);
+  printf("EDGES=%3d ",fnedge);
+  //printf("(rising %3d ,falling %3d )",fposc,fnegc);// useful only while parsing
+	//printf("Tree entry = %d",ftotEvents); // useful only while parsing
+  printf("\n");
+
+	if (verbosity == 1) return;
+	
+
+	for(int i=0;i<(int)fnedge;i++){
+		if(fchannel[i]==channel||channel>=192){
+			printf("\t%3d) CH%4d ",i+1,fchannel[i]);  
+			if(fpolarity[i]==0) printf(" RISE %4d \n",ftime[i]); else  printf(" FALL %4d \n",ftime[i]);  
+		}
+	}	
+}
+
+
+void 	TRich_TDC::EdgeList(){
+
+
+	// Event ID select
+	unsigned int curr = ftid;
+	unsigned int skip = 2; // Trigger ID 0 and 1 are skipped
+	if(curr<skip) return;
+
+	// Set the edge list variables associated with the tree
+	for (unsigned int i=0; i<fnedge; i++){ 
+		fpolarity[i]=fEdgeList[i].edge;
+		fchannel[i]=fEdgeList[i].chan;
+		ftime[i]=fEdgeList[i].time;
+	}
+}
+
+
+int	TRich_TDC::Fill(){
+
+
+	// now the new entry is ready to be filled in the tree
+	// you must have set all the variables associated eith the tree using the specific method of this class
+
+	int Nbyte = ftree->Fill(); 
+
+	if(Nbyte<=0) printf("Error during Filling Tree. Fill returned %d\n",Nbyte);
+
+	ftotEvents++;
+	
+	// Reset variables associated with the tree
+	Reset();
+
+	return Nbyte;
+}
+
+unsigned int TRich_TDC::NEdges(){
+
+	return fnedge;
+}
+
+
+unsigned int TRich_TDC::Polarity(unsigned int edge){
+
+
+	if (edge<fnedge) return fpolarity[edge];
+
+	return 2; // only 0 and 1 are allowed
+}
+
+unsigned int TRich_TDC::Channel(unsigned int edge){
+
+
+	if (edge<fnedge) return fchannel[edge];
+
+	return 192; // only [0,1,191] are allowed
+}
+
+unsigned int TRich_TDC::Time(unsigned int edge){
+
+
+	if (edge<fnedge) return ftime[edge];
+
+
+	return 8192; // only [0.8191] are allowed (to be confirmed...)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // TO DO: rewrite the code in half lines!
 // 
 // (?)when identification is done the function returns (check that all the data you wants are with you ;-)
@@ -151,9 +284,7 @@ void TRich_TDC::Edge(unsigned int chan,unsigned int time, unsigned int edge){
 
 int	TRich_TDC::Process(){
 
-
-	
-  bool p =false;
+  bool p =true;
 
 	if(p){printf("EVTID %5d ",ftid);}
 
@@ -175,11 +306,9 @@ int	TRich_TDC::Process(){
     printf("EDGES %3d ",size);
 	}
 
-p = false;
-  
   if (size>0)
 	{ 
-      //	printf("(rising %3d ,falling %3d )\n",fposc,fnegc);
+
       
       // Edge list 
 			if(p){printf("\n\t\t\t\t\t EDGE LIST\n");}
@@ -301,9 +430,8 @@ p = false;
 	}else { // size = 0
 		if(p){printf(" NO HITS\n");}
 	}
-if(p){printf("\n");}
+	if(p){printf("\n");}
 
-p = false;
 	int Nbyte = ftree->Fill(); 
 	ftotEvents++;
 		if(p){printf("Filled Events = %d\n",ftotEvents);}
@@ -313,3 +441,60 @@ p = false;
 	
 	return 0;
 }
+
+
+
+bool TRich_TDC::OpenFile(const char * filename){
+
+	if(filename==NULL) return false;
+
+
+	ffile = new TFile(filename,"READ"); 
+	
+	if (!ffile->IsOpen()){
+		printf(" File %s not found, please call TRich_Analysis::Ingest()\n",filename); 
+		return false;
+	}else{ 
+		//printf(" File %s opened\n",filename);	
+		return true;
+	}
+}
+
+int TRich_TDC::RetrieveTree(){
+
+	int nentries = 0;
+
+	if(!ffile){
+		printf("Sorry I need an open file to retrieve the tree, please call TRich_TDC::OpenFile before!\n");
+		return nentries;
+	}
+
+  ftree = (TTree*)ffile->Get("TDCdata"); // better using a macro in general header
+  nentries = ftree->GetEntries();
+
+
+  ftree->SetBranchAddress("triggerID"	,&ftid);
+  ftree->SetBranchAddress("tstamp0"		,&fts0);
+  ftree->SetBranchAddress("tstamp1"		,&fts1);
+  ftree->SetBranchAddress("nedge"			,&fnedge);
+  ftree->SetBranchAddress("polarity"	,fpolarity);
+  ftree->SetBranchAddress("channel"		,fchannel);
+  ftree->SetBranchAddress("time"			,ftime);
+
+
+
+	return nentries;
+}
+bool TRich_TDC::GetEntry(int entryID){
+
+	this->Reset();
+
+	ftree->GetEntry(entryID);
+
+	this->DecodeTimeStamp();
+
+	return true;
+}
+
+
+

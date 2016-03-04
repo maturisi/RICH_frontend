@@ -8,7 +8,7 @@ typedef struct
 	unsigned int	chan; // channel
 	unsigned int	time; // [ns] delay from trigger timestamp 
 	unsigned int	edge; // 0 =  rising 1 = falling 
-	
+
 }RICH_tdc_edge_t;
 
 typedef struct
@@ -16,22 +16,8 @@ typedef struct
 	int	did;
 	int	thr;
 	int	gain[64];
-	
+
 }RICH_maroc_t;
-
-
-typedef struct
-{
-	//string deviceModel; // = "Lecroy9210";
-	float vhigh; //= 0 [mV]
-	float vlow;//= -50 [mV]
-	float width; //= 50.0 [us]
-	float delay; //= 0 [us?]
-	float lead; //= 0.9 [ns]
-	float trail;// = 0.9 [ns]
-	float period;// = 100 [us]
-	
-}ExtPulser_t;
 
 typedef struct
 {
@@ -40,6 +26,7 @@ typedef struct
 	int pulser_freq;
 	float pulser_dutycycle;
 	int pulser_repetition;
+	int pulser_amplitude;
 
 	int trig_delay;
 	int trig_source;
@@ -49,7 +36,7 @@ typedef struct
 	int block_nevents;
 
 	int out[3];
-	
+
 }RICH_fpga_t;
 
 
@@ -97,12 +84,11 @@ typedef struct
 	unsigned int inv_startCmptGray;
 	unsigned int ramp_8bit;
 	unsigned int ramp_10bit;
-	
+
 	unsigned int DAC0;
-	unsigned int DAC1;	
-	
+	unsigned int DAC1;
 	unsigned int gain;
-	
+
 }RICH_maroc_common_t;
 
 
@@ -148,7 +134,7 @@ typedef struct
 			unsigned int inv_discriADC: 1;
 		} bits;
 	} Global0;
-	
+
 	union
 	{
 		unsigned int val;
@@ -166,7 +152,7 @@ typedef struct
 			unsigned int Reserved0		: 23;
 		} bits;
 	} Global1;
-	
+
 	union
 	{
 		unsigned int val;
@@ -178,9 +164,9 @@ typedef struct
 			unsigned int Reserved1	: 6;
 		} bits;
 	} DAC;
-	
+
 	unsigned int Reserved0;
-	
+
 	union
 	{
 		unsigned int val;
@@ -198,7 +184,7 @@ typedef struct
 			unsigned int Reserved1: 4;
 		} bits;
 	} CH[32];
-	
+
 } MAROC_Regs;
 
 typedef struct
@@ -211,18 +197,19 @@ typedef struct
 
 typedef struct
 {
-	/* 0x0000-0x0003 */ unsigned int		Ctrl;
-	/* 0x0004-0x0007 */ unsigned int		Reserved0[(0x0008-0x0004)/4];
-	/* 0x0008-0x000B */ unsigned int		SpiCtrl;
-	/* 0x000C-0x000F */ unsigned int		SpiStatus;
-	/* 0x0010-0x00FF */ unsigned int		Reserved1[(0x0100-0x0010)/4];
+/* 0x0000-0x0003 */ unsigned int		Ctrl;
+/* 0x0004-0x0007 */ unsigned int		Reserved0[(0x0008-0x0004)/4];
+/* 0x0008-0x000B */ unsigned int		SpiCtrl;
+/* 0x000C-0x000F */ unsigned int		SpiStatus;
+/* 0x0010-0x00FF */ unsigned int		Reserved1[(0x0100-0x0010)/4];
 } RICH_clk;
 
 typedef struct
 {
 	/* 0x0000-0x0003 */ unsigned int		SerCtrl;
 	/* 0x0004-0x0007 */ unsigned int		SerStatus;
-	/* 0x0008-0x000F */ unsigned int		Reserved0[(0x0010-0x0008)/4];
+	/* 0x0008-0x000B */ unsigned int		CTestDac;
+	/* 0x000C-0x000F */ unsigned int		Reserved0[(0x0010-0x000C)/4];
 	/* 0x0010-0x009F */ MAROC_Regs			Regs;
 	/* 0x00A0-0x00AF */ MAROC_DyRegs		DyRegs_WrAll;
 	/* 0x00B0-0x00DF */ MAROC_DyRegs		DyRegs_Rd[3];
@@ -240,7 +227,16 @@ typedef struct
 	/* 0x0100-0x01FF */ unsigned int		Scalers[64];
 } RICH_Maroc_Proc;
 
-
+typedef struct
+{
+/* 0x0000-0x0003 */ unsigned int		AdcCtrl;
+/* 0x0004-0x0007 */ unsigned int		AdcStatus;
+/* 0x0008-0x000B */ unsigned int		Hold1Delay;
+/* 0x000C-0x000F */ unsigned int		Hold2Delay;
+/* 0x0010-0x0013 */ unsigned int		AdcAddr;
+/* 0x0014-0x001F */ unsigned int		AdcData[3];
+/* 0x0020-0x00FF */ unsigned int		Reserved0[(0x0100-0x0020)/4];
+} RICH_MAROC_Adc;
 
 typedef struct
 {
@@ -259,11 +255,43 @@ typedef struct
 } RICH_EvtBuilder;
 
 
+typedef struct
+{
+/* 0x0000-0x0003 */ unsigned int		ErrCtrl;
+/* 0x0004-0x0007 */ unsigned int		ErrAddrL;
+/* 0x0008-0x000B */ unsigned int		ErrAddrH;
+/* 0x000C-0x000F */ unsigned int		Reserved0[(0x0010-0x000C)/4];
+/* 0x0010-0x0013 */ unsigned int		HeartBeatCnt;
+/* 0x0014-0x0017 */ unsigned int		InitializationCnt;
+/* 0x0018-0x001B */ unsigned int		ObservationCnt;
+/* 0x001C-0x001F */ unsigned int		CorrectionCnt;
+/* 0x0020-0x0023 */ unsigned int		ClassifactionCnt;
+/* 0x0024-0x0027 */ unsigned int		InjectionCnt;
+/* 0x0028-0x002B */ unsigned int		EssentialCnt;
+/* 0x002C-0x002F */ unsigned int		UncorrectableCnt;
+/* 0x0030-0x0033 */ unsigned int		RamAddr;
+/* 0x0034-0x0037 */ unsigned int		RamWrData;
+/* 0x0038-0x003B */ unsigned int		RamRdData;
+/* 0x003C-0x003F */ unsigned int		Reserved1[(0x0040-0x003C)/4];
+/* 0x0040-0x0043 */ unsigned int		RegData;
+/* 0x0044-0x0047 */ unsigned int		RegCtrl;
+/* 0x0048-0x004F */ unsigned int		Reserved2[(0x0050-0x0048)/4];
+/* 0x0050-0x0053 */ unsigned int		MonRd;
+/* 0x0054-0x0057 */ unsigned int		MonWr;
+/* 0x0058-0x005B */ unsigned int		MonStatus;
+/* 0x005C-0x005F */ unsigned int		Reserved3[(0x0060-0x005C)/4];
+/* 0x0060-0x0063 */ unsigned int		XAdcCtrl;
+/* 0x0064-0x0067 */ unsigned int		XAdcStatus;
+/* 0x0068-0x00FF */ unsigned int		Reserved4[(0x0100-0x0068)/4];
+} RICH_Testing;
+
+
 
 typedef struct
 {
 	/* 0x0000-0x000B */ unsigned int		OutSrc[3];
-	/* 0x000C-0x0037 */ unsigned int		Reserved0[(0x0038-0x000C)/4];
+	/* 0x000C-0x0033 */ unsigned int		Reserved0[(0x0034-0x000C)/4];
+	/* 0x0034-0x0037 */ unsigned int		AdcTrigSrc;
 	/* 0x0038-0x003B */ unsigned int		CTestSrc;
 	/* 0x003C-0x003F */ unsigned int		TrigSrc;
 	/* 0x0040-0x0043 */ unsigned int		SyncSrc;
@@ -283,7 +311,7 @@ typedef struct
 	/* 0x0110-0x0113 */ unsigned int		Scaler_Trig;
 	/* 0x0114-0x011F */ unsigned int		Scaler_Input[3];
 	/* 0x0120-0x012B */ unsigned int		Scaler_Output[3];
-	/* 0x012C-0x0133 */ unsigned int		Scaler_Or1[2]; //chip[or]
+  /* 0x012C-0x0133 */ unsigned int		Scaler_Or1[2]; //chip[or]
 	/* 0x0134-0x013B */ unsigned int		Scaler_Or2[2];
 	/* 0x013C-0x0143 */ unsigned int		Scaler_Or3[2];
 	/* 0x0144-0x0147 */ unsigned int		Scaler_Busy;
@@ -294,12 +322,21 @@ typedef struct
 
 typedef struct
 {
-	/* 0x0000-0x00FF */ RICH_clk			Clk;
-	/* 0x0100-0x01FF */ RICH_MAROC_Cfg		MAROC_Cfg;
-	/* 0x0200-0x03FF */ RICH_sd			Sd;
-	/* 0x0400-0x0FFF */ unsigned int		Reseverd0[(0x1000-0x0400)/4];
-	/* 0x1000-0x15FF */ RICH_Maroc_Proc		MAROC_Proc[3];
-	/* 0x1600-0x1FFF */ unsigned int		Reseverd1[(0x2000-0x1600)/4];
-	/* 0x2000-0x20FF */ RICH_EvtBuilder		EvtBuilder;
+/* 0x0000-0x00FF */ RICH_clk		Clk;
+/* 0x0100-0x01FF */ RICH_MAROC_Cfg	MAROC_Cfg;
+/* 0x0200-0x03FF */ RICH_sd		Sd;
+/* 0x0400-0x04FF */ RICH_MAROC_Adc	MAROC_Adc;
+/* 0x0500-0x0FFF */ unsigned int	Reserved0[(0x1000-0x0500)/4];
+/* 0x1000-0x15FF */ RICH_Maroc_Proc	MAROC_Proc[3];
+/* 0x1600-0x1FFF */ unsigned int	Reserved1[(0x2000-0x1600)/4];
+/* 0x2000-0x20FF */ RICH_EvtBuilder	EvtBuilder;
+/* 0x2100-0x2FFF */ unsigned int	Reserved2[(0x3000-0x2100)/4];
+/* 0x3000-0x30FF */ RICH_Testing	Testing;
 } RICH_regs;
+
+
+
+
+
+
 #endif

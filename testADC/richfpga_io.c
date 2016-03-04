@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <arpa/inet.h> 
+#include <arpa/inet.h>
 #include "richfpga_io.h"
 
 RICH_regs *pRICH_regs = (RICH_regs *)0x0;
@@ -290,24 +290,26 @@ void rich_init_regs(MAROC_Regs *regs)
 	regs->Global1.bits.ONOFF_otabg = 0;
 	regs->Global1.bits.ONOFF_dac = 0;
 	regs->Global1.bits.small_dac = 0; /* 0=2.3mV/DAC LSB, 1=1.1mV/DAC LSB */
-	regs->Global1.bits.enb_outADC = 0;
-//	regs->Global1.bits.enb_outADC = 1;
+	regs->Global1.bits.enb_outADC = 0; // must be 0 to see the two OR ouputs
 	regs->Global1.bits.inv_startCmptGray = 0;
 	regs->Global1.bits.ramp_8bit = 0;
 	regs->Global1.bits.ramp_10bit = 0;
 //	regs->DAC.bits.DAC0 = 300; /* with small_dac = 0,  pedestal < ~200, signal ~200 to ~500, 500fC/pulse injected */
-	regs->DAC.bits.DAC0 = 300; 
+	regs->DAC.bits.DAC0 = 300;
 	regs->DAC.bits.DAC1 = 0;
 
 
 	int lgain =64;   /* GAIN 64 = unity */
-	int ctest =1;	
+	int ctest =0;
+	int maskOR = 1;
 	for(i = 0; i < 64; i++)
 	{
-	
-		//if(i == 0) ctest = 1;
-		//else ctest = 0;
-/*		
+
+		if(i == 16) ctest = 0;
+		else ctest = 1;
+	//	if(i == 48) lgain = 192;
+	//	else lgain = 64;
+/*
 		regs->CH[i].bits.Gain = lgain;
 		regs->CH[i].bits.Sum = 0;
 		regs->CH[i].bits.CTest = ctest;
@@ -315,18 +317,17 @@ void rich_init_regs(MAROC_Regs *regs)
 */
 		if(!(i & 0x1))
 		{
-			
 			regs->CH[i>>1].bits.Gain0 = lgain; 
 			regs->CH[i>>1].bits.Sum0 = 0;
 			regs->CH[i>>1].bits.CTest0 = ctest; 
-			regs->CH[i>>1].bits.MaskOr0 = 0;
+			regs->CH[i>>1].bits.MaskOr0 = maskOR;
 		}
 		else
 		{
 			regs->CH[i>>1].bits.Gain1 = lgain; 
 			regs->CH[i>>1].bits.Sum1 = 0;
 			regs->CH[i>>1].bits.CTest1 = ctest;
-			regs->CH[i>>1].bits.MaskOr1 = 0;
+			regs->CH[i>>1].bits.MaskOr1 = maskOR;
 		}
 
 
@@ -437,7 +438,7 @@ void rich_init_dynregs(MAROC_DyRegs *regs)
 
 	memset(regs, 0, sizeof(MAROC_DyRegs));
 
-	regs->Ch0_31_Hold1 = 0x00000001;
+	regs->Ch0_31_Hold1 = 0x00008000;
 	regs->Ch32_63_Hold1 = 0x00000000;
 	regs->Ch0_31_Hold2 = 0x00000000;
 	regs->Ch32_63_Hold2 = 0x00000000;
@@ -738,15 +739,15 @@ void rich_check_adc()
 
 	i = rich_read32(&pRICH_regs->Sd.CTestDelay);
 
-	if(!f) f = fopen("adc_dly005_trigMRC.txt", "wt");
-	
+	if(!f) f = fopen("prova3A.txt", "wt");
+
 	printf("rich_check_adc() - ready=%X (hold=%3d) (ctestdly=%3d): \n", ready, hold_delay, i);
 	if((ready & 0x7) == 0x7)
 	{
 		printf("rich_check_adc() - valid (hold=%3d): ", hold_delay);
-	
+
 		fprintf(f, "%d\t%d\t", sample++, hold_delay);
-		
+
 		for(i = 0; i < 3; i++)
 		{
 			for(addr = 0; addr < 64; addr++)
@@ -785,7 +786,8 @@ void rich_setmask_fpga_or(int m0_0, int m0_1, int m1_0, int m1_1, int m2_0, int 
 
 void rich_ctest_amp(float pC)
 {
-	int dac = (pC / 5.0) * 4095.0, lDACword;
+	int dac = (pC / 5.0) * 4095.0;
+	int lDACword;
 	float pC_actual, mV_actual;
 
 	if(dac < 0)	dac = 0;
@@ -793,15 +795,28 @@ void rich_ctest_amp(float pC)
 
 	mV_actual = 2500.0 * dac / 4095.0;
 	pC_actual = 5.0 * dac / 4095.0;
-	lDACword = dac<<2;
+	
+lDACword = dac<<2;
 
-	printf("DAC setting: user %4.3f [pC], actual %4.3f [pC] %d [mV] %04X [DAC word]\n",pC,pC_actual,mV_actual, lDACword);
+	printf("DAC setting:");
+	printf("user %4.3f [pC]",pC);
+//	printf("actual %4.3f [pC]",pC_actual);
+//	printf(" %4.3f [mV]",mV_actual);
+
+	printf("dac %d [a.u.]",dac);
+	printf("dac %d [a.u.]",lDACword);
+
+
+	printf("\n");
+	//printf("DAC setting: user %4.3f [pC], actual %4.3f [pC] %d [mV] %04X [DAC word]\n",pC,pC_actual,mV_actual, lDACword);
+
 	rich_write32(&pRICH_regs->MAROC_Cfg.CTestDac, lDACword);
 }
 
 /*****************************************************************/
 /*****************************************************************/
 /*****************************************************************/
+
 
 #define MAROC_NUM		3
 
@@ -1031,6 +1046,7 @@ int rich_FirmwareUpdate(const char *filename)
 			rich_TransferSpi((addr>>8)&0xFF);
 			rich_TransferSpi((addr)&0xFF);
 			for(i = 0; i < 256; i++)
+
 				rich_TransferSpi(buf[i]);
 			rich_SelectSpi(0);
 
@@ -1069,6 +1085,7 @@ int rich_FirmwareRead(const char *filename)
 	unsigned char rspId[3];
 
 	rich_SelectSpi(0);
+
 	rich_FlashGetId(rspId);
 	
 	printf("Flash: Mfg=0x%02X, Type=0x%02X, Capacity=0x%02X\n", rspId[0], rspId[1], rspId[2]);
@@ -1106,6 +1123,7 @@ int rich_FirmwareRead(const char *filename)
 	}
 	else
 	{
+
 		printf("%s: ERROR: failed to identify flash id 0x%02X\n", __FUNCTION__, flashId);
 		return ERROR;
 	}
@@ -1239,7 +1257,7 @@ int main(int argc, char *argv[])
 
 	rich_test_regs();
 	
-	rich_set_pulser(1000.0, 0.5, 0xFFFFFFFF);					// freq, dutycycle, repetition (0= disable,0xffffffff = infinite)
+	rich_set_pulser(100.0, 0.5, 0xFFFFFFFF);					// freq, dutycycle, repetition (0= disable,0xffffffff = infinite)
 
 	// Setup FPGA version of MAROC OR (note: this OR is formed in the FPGA from the MAROC hits and does not use the MAROC_OR signal)
 	rich_setmask_fpga_or(0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000);
@@ -1247,9 +1265,9 @@ int main(int argc, char *argv[])
 	rich_write32(&pRICH_regs->Sd.OutSrc[0], SD_SRC_SEL_PULSER);			// output pulser to TTL outputs for probing/scope trigger
 	rich_write32(&pRICH_regs->Sd.OutSrc[1], SD_SRC_SEL_PULSER);
 	rich_write32(&pRICH_regs->Sd.OutSrc[2], SD_SRC_SEL_MAROC_OR);		// output FPGA MAROC OR to TTL outputs for probing/scope trigger
-	
-//	rich_write32(&pRICH_regs->Sd.AdcTrigSrc, SD_SRC_SEL_PULSER);		// internal pulser fires adc trigger							
-	rich_write32(&pRICH_regs->Sd.AdcTrigSrc, SD_SRC_SEL_MAROC_OR1_0);	// MAROC 1 OR fires adc trigger
+
+	rich_write32(&pRICH_regs->Sd.AdcTrigSrc, SD_SRC_SEL_PULSER);		// internal pulser fires adc trigger							
+//	rich_write32(&pRICH_regs->Sd.AdcTrigSrc, SD_SRC_SEL_MAROC_OR1_0);	// MAROC 1 OR fires adc trigger
 
 	rich_write32(&pRICH_regs->MAROC_Adc.Hold1Delay, 0);
 	rich_write32(&pRICH_regs->MAROC_Adc.Hold2Delay, 0);
@@ -1265,16 +1283,22 @@ int main(int argc, char *argv[])
 
 	/* CTest */
 	rich_write32(&pRICH_regs->Sd.CTestSrc, SD_SRC_SEL_PULSER);
-	int trig_delay = 5 ;// [clock ticks unit] 
+	int trig_delay = 5 ;// [clock ticks unit]
 	rich_write32(&pRICH_regs->Sd.CTestDelay, trig_delay); 
 
 	/* Configure DAC */
 	rich_ctest_amp(1.0);
+	
 
+	/* Reset Event FIFO*/
 	rich_fifo_reset();
 	rich_fifo_status();
+
+	/* Configure Event Builder*/
 	rich_setup_readout(1200/8, 800/8);										// lookback 1.2us, capture 400ns
 	
+
+	/* Enable TDC*/
 	rich_disable_all_tdc_channels();
 	rich_enable_all_tdc_channels();
 	
@@ -1293,10 +1317,14 @@ int main(int argc, char *argv[])
 	while(1)
 	{
 
-	rich_ctest_amp(1);
+//	rich_ctest_amp(1.0);
+
+	rich_ctest_amp(ctest_pC);
 	ctest_pC = ctest_pC + 0.002;
-	if(ctest_pC > 1) ctest_pC = 0.0;
+	if(ctest_pC > 2.0) ctest_pC = 0.0;
 	usleep(10000);
+
+	//sleep(1);
 
 
 /*
@@ -1316,20 +1344,20 @@ int main(int argc, char *argv[])
 			{
 				printf("[0x%08X] nevents = %lld, nbytes = %lld, dbytes = %lld\n", val, nevents, nbytes, dbytes);
 				fflush(stdout);
-				
+
 				dbytes = 0;
 				rich_fifo_status();
 			}
 		}
 */
-	
 
-		
+
+
 //		rich_fifo_status();
 //	rich_dump_scalers();
 //sleep(1);
-//		rich_check_adc();
-//		usleep(1000);
+	//	rich_check_adc();
+		//usleep(1000);
 
 //		printf(".");
 //		fflush(stdout);
@@ -1337,6 +1365,6 @@ int main(int argc, char *argv[])
 	close(sockfd_reg);
 	close(sockfd_event);
 	fclose(f);
-	
+
 	return 0;
 }

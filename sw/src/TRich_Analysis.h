@@ -40,39 +40,41 @@ private:
   int frunID_first;
   int frunID_last;
 
-  string frun_path;
-  string frun_file;
-  string frun_name;
-	string frun_prefix; 
+  std::string frun_path;
+  std::string frun_file;
+  std::string frun_name;
+	std::string frun_prefix; 
   int		 frun_id;	
-	string frun_suffix; 
+	std::string frun_suffix; 
 
-	string fTDCroot;
-	string fTDCscanroot;
+	std::string fTDCroot;
+	std::string fTDCscanroot;
 
-	string fTDCpdf;
-  string fTDCscanpdf;
+	std::string fTDCpdf;
+  std::string fTDCscanpdf;
 
-  string fthrscan_eps_all; 
+  std::string fthrscan_eps_all; 
   
-  string fsource ; // Laser, Dark, Background
-  string fplot; // Rate, Efficiency
+  std::string fsource ; // Laser, Dark, Background
+  std::string fplot; // Rate, Efficiency
   int fnorm;// Duration [s], or Laser Rate [Hz] 
   
   // first version
-  string finraw;
-  string finlog;
-  string fintxt;
-  string fioTDCroot; 
-  string fioSKAroot_Scan;
-  string fprefix;
- // string fPlotTimeStamp;
- // string fPlotTimeStampIntervals;
+  std::string finraw;
+  std::string finlog;
+  std::string fintxt;
+  std::string fioTDCroot; 
+	std::string fioTDCtrigger; 
+
+  std::string fioSKAroot_Scan;
+  std::string fprefix;
+ // std::string fPlotTimeStamp;
+ // std::string fPlotTimeStampIntervals;
   
- // string fPlotChannel; // temporary, the name must change 
- // string fPlotEdge; // ...same
- // string fPlotTime; //..same
-  //string fPlotTime_SingleChannel;
+ // std::string fPlotChannel; // temporary, the name must change 
+ // std::string fPlotEdge; // ...same
+ // std::string fPlotTime; //..same
+  //std::string fPlotTime_SingleChannel;
   
  
   int fposedge[192];	// equivalent of scaler 
@@ -98,10 +100,10 @@ private:
 	std::string inPrefix(){return frun_prefix;}
 
   void SetDaqMode(int daqmode); // 0 for scaler analysis, 1 for tdc analysis
-  void SetSource(string sourceName=" Laser, Dark or Background ?",string plotName="Rate or Efficiency?",int normalization=1);
+  void SetSource(std::string sourceName=" Laser, Dark or Background ?",std::string plotName="Rate or Efficiency?",int normalization=1);
   
   void Print();
-  int SetNames(string runPrefix = NULL,int runID_first =0,int runID_last=0,string runPath = "../data/out/");
+  int SetNames(std::string runPrefix = NULL,int runID_first =0,int runID_last=0,std::string runPath = "../data/out/");
   int NameRun(const char * fileraw = NULL,int runID_last=0,bool enablePrint = false);
   
   unsigned int	GetThreshold();
@@ -116,6 +118,9 @@ private:
   
   // TDC
   int		TDC_Read();
+	void 	TDC_Spectra();
+	void 	Plot(); // NEW 3 mARCH 2016
+	
 	void 	ProcessTDC();
 	void 	ProcessTDCTEMP(); // BACK UP copy during sw update
 	void 	ProcessTDCscan();

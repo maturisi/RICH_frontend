@@ -30,7 +30,6 @@ TRich_Config::TRich_Config(){
   memset(&ffp, 0, 1 * sizeof(RICH_fpga_t));
   memset(&fmp, 0, 1 * sizeof(RICH_maroc_common_t));
   memset(&fmpa,0, 3 * sizeof(RICH_maroc_t));
-  memset(&fext,0, 1 * sizeof(ExtPulser_t));
   
   fdaqmode = -1;	
   fEv_preset = -1;
@@ -85,7 +84,7 @@ void	TRich_Config::AddParam_RUN(Config * configuration){
   run.add("name"	, Setting::TypeString) = "run";
   run.add("note"	, Setting::TypeString) = "Test Bench INFN-Ferrara (Italy), 2015 August 14th";
   
-	run.add("daq_mode"	, Setting::TypeInt) = 1; // 0 scaler; 1 TDC (obsolete); 2 TDC    
+	run.add("daq_mode"	, Setting::TypeInt) = 0; // 0 scaler; 1 TDC (obsolete); 2 TDC    
 	
 	run.add("tdc_event_preset"	, Setting::TypeInt) = 10000; // # of events
  	run.add("tdc_time_preset"	, Setting::TypeInt) = 2; // seconds 
@@ -124,9 +123,10 @@ void	TRich_Config::AddParam_FPGA(Config * configuration){
   xil.add("fpgaID", Setting::TypeInt) = 1;
   xil.add("firmwareVer", Setting::TypeInt) = 1;// 0 scaler; 1 = 0+tdc internal pulser
   
-  xil.add("pulser_frequency", Setting::TypeInt) = 50000;
-  xil.add("pulser_dutycycle", Setting::TypeFloat) = 0.05;
+  xil.add("pulser_frequency", Setting::TypeInt) = 1000;
+  xil.add("pulser_dutycycle", Setting::TypeFloat) = 0.5;
   xil.add("pulser_repetition", Setting::TypeInt) = 10000000;
+  xil.add("pulser_amplitude", Setting::TypeInt) = 1308;
   
   xil.add("out0", Setting::TypeInt) = 18; 
   xil.add("out1", Setting::TypeInt) = 14; 
@@ -209,7 +209,7 @@ void	TRich_Config::AddParam_MAROC3_com(Config * configuration){
   sc.add("sw_fsb2_50f", Setting::TypeInt) = 1;
   sc.add("valid_dc_fsb2", Setting::TypeInt) = 0;
   sc.add("ENb_tristate", Setting::TypeInt)= 1;
-  sc.add("polar_discri", Setting::TypeInt) = 0;
+  sc.add("polar_discri", Setting::TypeInt) = 1;
   sc.add("inv_discriADC", Setting::TypeInt) = 0;
   sc.add("d1_d2", Setting::TypeInt) = 0;
   sc.add("cmd_CK_mux", Setting::TypeInt) = 0;
@@ -220,7 +220,7 @@ void	TRich_Config::AddParam_MAROC3_com(Config * configuration){
   sc.add("inv_startCmptGray", Setting::TypeInt) = 1;
   sc.add("ramp_8bit", Setting::TypeInt) = 0;
   sc.add("ramp_10bit", Setting::TypeInt) = 0;
-  sc.add("DAC0", Setting::TypeInt) = 200; 
+  sc.add("DAC0", Setting::TypeInt) = 210; 
   sc.add("DAC1", Setting::TypeInt) = 0;
   sc.add("gain", Setting::TypeInt) = 64; 
 
@@ -294,34 +294,13 @@ ext.add("w", Setting::TypeInt)= -1;
 }
 
 
-void	TRich_Config::AddParam_EXTPULSER(Config * configuration){
-	
-	Setting &root  = configuration->getRoot();
-	Setting &fe = root["run"]["fe"];
-	
-	if(! fe.exists("external_pulser")){fe.add("external_pulser", Setting::TypeGroup);}
-	
-	Setting &extpulser = fe["external_pulser"];
-
-
-
-//	Setting &lecroy = extpulser.add(Setting::TypeGroup);
-	extpulser.add("LecroyModel", Setting::TypeString) = "Lecroy9210";
-	extpulser.add("Vhigh_mV", Setting::TypeFloat) = 0.0; //mV
-	extpulser.add("Vlow_mV", Setting::TypeFloat) = -50.0;//mV
-	extpulser.add("Width_us", Setting::TypeFloat) = 50.00; //microsecond
-	extpulser.add("Delay_us", Setting::TypeFloat) = 0.0;
-	extpulser.add("Lead_ns", Setting::TypeFloat) = 0.90; // nanosecond
-	extpulser.add("Trail_ns", Setting::TypeFloat) = 0.90; // nanosecond
-	extpulser.add("Period_us", Setting::TypeFloat) = 100.0; // microsecond	
-
-}
-
 void	TRich_Config::ParseInputLine(int argc,char *argv[]){
 
 	int i;
 	char cdummy[1000];
 	std::string sarg;
+
+bool p = true;
 	
     // init
     fargp = new std::string[argc]; // max settings expected
@@ -360,11 +339,6 @@ void	TRich_Config::ParseInputLine(int argc,char *argv[]){
 /*
 		./rich run.fe.fpga.pulser_frequency=30
 		./rich run.fe.fpga.pulser_frequency=11
-		./rich run.fe.fpga.external_pulser.Vhigh_mV=300
-		./rich run.fe.external_pulser.Vhigh_mV=300
-		./rich run.fe.external_pulser.Vhigh_mV=300
-		./rich run.fe.external_pulser.Vhigh_mV=50.0
-		./rich run.fe.external_pulser.Vhigh_mV=0.0
 		./rich run.fe.mrc.dynamic_register.Ch0_31_Hold2=0x3
 		./rich run.fe.mrc.dyn.Ch0_31_Hold2=0x3
 		./rich run.fe.mrc.dyn.Ch0_31_Hold2=0
@@ -378,7 +352,7 @@ void	TRich_Config::ParseInputLine(int argc,char *argv[]){
 		./rich run.fe.mrc.sc.gain=64
 */		
 		sarg = argv[i];
-		cout << __FUNCTION__ << " process inline argument " << sarg << endl;
+	if(p)	cout << __FUNCTION__ << " process inline argument " << sarg << endl;
 		size_t found;
 		
 		found=sarg.find_first_of("=");      
@@ -435,6 +409,8 @@ bool from_string(T& t, const std::string& s, std::ios_base& (*f)(std::ios_base&)
 }
 int TRich_Config::Replace(const string value,string path){
 
+
+	bool p = true;
 	//printf("value = %s ",value.c_str());
 	//printf("path = %s ",path.c_str());
 	//printf("\n");
@@ -446,7 +422,7 @@ int TRich_Config::Replace(const string value,string path){
 	bool boo;
 	
 	if (fcfg.exists(path)) {
-		cout << __FUNCTION__ << ": " << path << " will be modified" << endl;
+		if(p)cout << __FUNCTION__ << ": " << path << " will be modified" << endl;
 		Setting &s1 = fcfg.lookup(path);
 		Setting::Type tp = s1.getType();
 		
@@ -653,27 +629,7 @@ char TRich_Config::GetNpmt(){
 }
 
 
-void TRich_Config::Read_Settings_External_Pulser(){
-	Setting & root = fcfg.getRoot();
-	
-	Setting & qinj = root["run"]["fe"]["external_pulser"];	
-	
-	
-	string deviceModel;
-	qinj.lookupValue("LecroyModel",deviceModel);
 
-//	printf("Device Model %s\n",deviceModel.c_str());
-
-	qinj.lookupValue("Vhigh_mV",fext.vhigh);
-	qinj.lookupValue("Vlow_mV",	fext.vlow);
-	qinj.lookupValue("Width_us",fext.width);
-	qinj.lookupValue("Delay_us",fext.delay);
-	qinj.lookupValue("Lead_ns", fext.lead);	
-	qinj.lookupValue("Trail_ns",fext.trail);	
-	qinj.lookupValue("Period_us",fext.period);	
-
-	
-}
 
 void TRich_Config::Read_Settings_FPGA(){
 		
@@ -688,6 +644,8 @@ void TRich_Config::Read_Settings_FPGA(){
 		fpga.lookupValue("pulser_frequency",ffp.pulser_freq);
 		fpga.lookupValue("pulser_dutycycle",ffp.pulser_dutycycle);
 		fpga.lookupValue("pulser_repetition",ffp.pulser_repetition);	
+		fpga.lookupValue("pulser_amplitude",ffp.pulser_amplitude);	
+
 		fpga.lookupValue("trig_source",ffp.trig_source);	
 		fpga.lookupValue("trig_delay",		ffp.trig_delay);	
 		fpga.lookupValue("evtb_lookback",	ffp.evtbuild_lookback);	
@@ -852,6 +810,8 @@ void TRich_Config::PrintFPGA(){
 	printf("\t\tfrequency  = %d [Hz]\n",ffp.pulser_freq);
 	printf("\t\tdutycycle  = %.3f\n",ffp.pulser_dutycycle);	
 	printf("\t\trepetition = %d [#]\n",ffp.pulser_repetition);	
+	printf("\t\tamplitude = %d [DAC]\n",ffp.pulser_amplitude);	
+
 }
 
 void TRich_Config::PrintMAROC_StaticReg(){
@@ -928,21 +888,7 @@ void TRich_Config::PrintMAROC_adj(){
 	}
 }
 
-void TRich_Config::PrintEXTERNAL_Pulser(){
-	
-	printf("Settings External Pulser:\n");
-	
-	printf("\tAMPLITUDE\n");	
-	printf("\t\tHigh  = %6.1f [mV]\n",fext.vhigh);
-	printf("\t\tLow   = %6.1f [mV]\n",fext.vlow);
-	printf("\tTIME\n");		
-	printf("\t\tWidth = %6.1f [us]\n",fext.width);
-	printf("\t\tDelay = %6.1f [us]\n",fext.delay);
-	printf("\t\tLead  = %6.1f [ns]\n",fext.lead);	
-	printf("\t\tTrail = %6.1f [ns]\n",fext.trail);	
-	printf("\t\tPeriod= %6.1f [us]\n",fext.period);	
 
-}
 
 
 
@@ -1020,6 +966,11 @@ int		TRich_Config::GetThr(int idx){
 	}
 }
 
+ int TRich_Config::GetCTestAmp(){
+	return ffp.pulser_amplitude;
+}
+
+
 
 string	TRich_Config::RunPrefix(){return frunprefix;}
 
@@ -1085,7 +1036,7 @@ void 	TRich_Config::Logbook(std::string setting_name,long long lval){
 
 	Setting & root = fcfg.getRoot();
 	if(! root.exists("logbook")){root.add("logbook",Setting::TypeGroup);}
-	Setting &logbook = root["logbook"];	
+	Setting &logbook = root["logbook"];	 
 	
 	logbook.add(setting_name, Setting::TypeInt64)= lval;
 }

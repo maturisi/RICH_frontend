@@ -59,7 +59,6 @@ class TRich_Config {
   RICH_fpga_t		ffp; 
   RICH_maroc_common_t	fmp;
   RICH_maroc_t		fmpa[3];
-  ExtPulser_t		fext;
   
   int	  ftrig_delay;
   int	  fevtbuild_lookback;
@@ -153,6 +152,10 @@ class TRich_Config {
 
   int GetGain(int idx=-1,int channel=-1);
   int GetThr(int idx=-1);
+
+  int GetCTestAmp();
+
+
 	
 	int Ch_Sel(int val =-1);
 

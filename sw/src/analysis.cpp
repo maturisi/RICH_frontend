@@ -11,19 +11,18 @@
 
 int main(int argc, char *argv[]){
 
- for (int i=0; i<argc; i++) { //debug
-	//printf("argv[%d] = %s\n",i,argv[i]);
-}
+	// parse input 
+	for (int i=0; i<argc; i++) { //debug
+	 //printf("argv[%d] = %s\n",i,argv[i]);
+  }
 //printf("argc = %d\n",argc);//debug
 
 	if(argc<=1){
-	printf("not enough arguments please specify ska or tdc\n");
-	return -1;
+	 printf("not enough arguments please specify ska or tdc\n");
+	 return -1;
 	}
 
 	int daq_mode = (strcmp("ska", argv[1]) == 0) ? SCALER_MODE:TDC_MODE; 
-
-	
 
 	string runPrefix;
 	int runID_first;
@@ -82,71 +81,69 @@ int main(int argc, char *argv[]){
 			if (repetition<0){return -2;}
 			A.Print();
 			printf("Reading,"); 
-
 			A.SKA_Read_Threshold_Scan(); 
 
+
+			// Represent Efficiency [# counts/ Ntrigger] or Rate [Hz]
 			laser = (strcmp("Laser", Source.c_str()) == 0) ? true:false;
 
 			if(laser){
 				minZ = 0.01;
-  				maxZ = 1.1;
+  			maxZ = 1.1;
 				minY =0.01;
 				maxY =1.1;
-
+				
 			}else{
-  				minZ = .1;
-  				maxZ = 40*1000*1000;
+  			minZ = .1;
+  			maxZ = 40*1000*1000;
 				minY=0.1;
 				maxY=40*1000*1000.;
 			}
-    			//printf("Plotting2D,");
-    			//A.SKA_Plot2(minY,maxY);
+    	
+    	// Single channel plot
+    	printf("Plotting2D,");
+    	A.SKA_Plot2(minY,maxY);
+			
+			// Gauguin Plot
 			printf("Plotting3D,");
 			thr_step = 3; //DAC0 units
 			A.SKA_Plot3(minZ,maxZ,thr_step);
-   			printf("done\n");
-   			break;
+   		printf("done\n");
+   		break;
 
 
 		case TDC_MODE:
 			
 			if (argc<4){
-      				printf("Error in %s: few arguments for TDC analysis...Exit\n",__FUNCTION__);
+      	printf("Error in %s: few arguments for TDC analysis...Exit\n",__FUNCTION__);
 				printf("Usage Example:\n");
-				printf("\tSINLE RUN: ./ana tdc ../../storage/150921_testpulse_discri1/run_000031.txt 31\n");
+				printf("\tSINGLE RUN: ./ana tdc ../../storage/150921_testpulse_discri1/run_000031.txt 31\n");
 				printf("\tMULTIRUN : ./ana tdc ../../storage/150921_testpulse_discri1/run_000031.txt 42\n");
-      				return -1;
-    			}
+      	return -1;
+    	}
 
 			
-
 			runName = argv[2];
 			runID_last = atoi(argv[3]);
 			runID  = A.NameRun(runName.c_str(),runID_last);
 
-			if(runID==-1){
-				printf("file doesn't exist\n");
-				break;
-			}
-
-			if(runID==-2){
-				printf("Error with run ID\n");
-				break;
-			}
-
-				
-				
-				A.Ingest(); // parse .bin into root file
-
+			if(runID==-1) {printf("file doesn't exist\n");break;}
 			
+			if(runID==-2){printf("Error with run ID\n");break;}
+		
+			A.Ingest(); // parse .bin into root file
 
 			if(A.SingleRun()){
-				//A.ProcessTDC(); // new! man at work // add histogram to rootfile
-				A.ProcessTDCTEMP();
+				A.TDC_Spectra();
+				A.Plot();
+				//A.ProcessTDC(); // new! man at work // add histogram to rootfile				
+				//A.ProcessTDCTEMP();// old
 			}
 			if(A.Scan()){
 				A.ProcessTDCscan();
 			}
+
+
   			break;
   		default:
     			printf("Error in %s: Unknown daq_mode",__FUNCTION__);

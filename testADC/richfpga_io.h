@@ -67,42 +67,29 @@ typedef struct
 		struct
 		{
 			unsigned int DAC0				: 10;
-			unsigned int Reserved0		: 6;
+			unsigned int Reserved0	: 6;
 			unsigned int DAC1				: 10;
-			unsigned int Reserved1		: 6;
+			unsigned int Reserved1	: 6;
 		} bits;
 	} DAC;
 
 	unsigned int Reserved0;
-/*
-	union
-	{
-		unsigned short val;
-		struct
-		{
-			unsigned short Gain			: 8;
-			unsigned short Sum				: 1;
-			unsigned short CTest			: 1;
-			unsigned short MaskOr			: 2;
-			unsigned short Reserved		: 4;
-		} bits;
-	} CH[64];
-*/
+
 	union
 	{
 		unsigned int val;
 		struct
 		{
 			unsigned int Gain0		: 8;
-			unsigned int Sum0		: 1;
+			unsigned int Sum0			: 1;
 			unsigned int CTest0		: 1;
-			unsigned int MaskOr0		: 2;
-			unsigned int Reserved0		: 4;
+			unsigned int MaskOr0	: 2;
+			unsigned int Reserved0: 4;
 			unsigned int Gain1		: 8;
-			unsigned int Sum1		: 1;
+			unsigned int Sum1			: 1;
 			unsigned int CTest1		: 1;
-			unsigned int MaskOr1		: 2;
-			unsigned int Reserved1		: 4;
+			unsigned int MaskOr1	: 2;
+			unsigned int Reserved1: 4;
 		} bits;
 	} CH[32];	
 	

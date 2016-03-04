@@ -19,7 +19,7 @@ class TRich_DAQ{
   FILE * fraw;
   TRich_Config * fcfg;
 
-  /* hardware */
+  /* hardware interface */
   TRich_Frontend * ffe;
 
   /* Statistics: event,time, duration */

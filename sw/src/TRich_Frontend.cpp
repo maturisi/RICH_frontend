@@ -19,7 +19,7 @@ TRich_Frontend::TRich_Frontend()
 {
 	ftcp 		= NULL;
 	fRICH_regs 	= NULL;
-	fConfigurator 	= NULL; 	
+	fConfigurator 	= NULL;
 
 	for(int i = 0; i < 3; i++)
 	{
@@ -62,6 +62,9 @@ void TRich_Frontend::CTest( int src )
 	printf("\n");
 
 	ftcp->Write(&fRICH_regs->Sd.CTestSrc, lsrc);	 // PULSER
+
+
+
 }
 
 
@@ -78,13 +81,13 @@ void TRich_Frontend::ConfigureEventBuilder(int tick_8ns)
 void TRich_Frontend::TriggerSource(int trig_src)
 {
   	int ltrig = trig_src; 
-	
+
 	printf("%s: ",__FUNCTION__);
 	PrintSource(ltrig);
 	printf("\n");
 
 	ftcp->Write(&fRICH_regs->Sd.TrigSrc,ltrig);
-}	
+}
 
 int	 TRich_Frontend::Fifo_nwords()
 {
@@ -99,7 +102,7 @@ void TRich_Frontend::Fifo_Reset()
 
 
 void TRich_Frontend::Fifo_Status(){
-	
+
 	int wordCnt, eventCnt;
 	wordCnt = ftcp->Read(&fRICH_regs->EvtBuilder.FifoWordCnt);
 	eventCnt = ftcp->Read(&fRICH_regs->EvtBuilder.FifoEventCnt);
@@ -136,7 +139,7 @@ void TRich_Frontend::PrintSource(int val){
 void TRich_Frontend::ConfigureOutSrc(int out0,int out1,int out2)
 {
 	printf("FPGA outputs: "); 
-	
+
 	PrintSource(out0);
 
 	printf(", ");
@@ -144,7 +147,7 @@ void TRich_Frontend::ConfigureOutSrc(int out0,int out1,int out2)
 	PrintSource(out1);
 
 	printf("\n");
-	
+
 	ftcp->Write(&fRICH_regs->Sd.OutSrc[0], out0);
  	ftcp->Write(&fRICH_regs->Sd.OutSrc[1], out1);
  	//ftcp->Write(&fRICH_regs->Sd.OutSrc[2], out2);
@@ -220,6 +223,40 @@ void TRich_Frontend::ClearRegsDyn(){
 
 }
 
+ void TRich_Frontend:: AdjPulseAmplitude(int dac){
+
+	// Adjust Pulse Amplitude (new on ASIC board version 2 )
+
+	if(dac < 0)	dac = 0;
+	if(dac > 4095)	dac = 4095;
+
+	int lDACword;
+
+ // Configure DAC
+	float pC = (dac/4095.0)*5;
+	float pC_actual, mV_actual;
+
+	mV_actual = 2500.0 * dac / 4095.0;
+	pC_actual = 5.0 * dac / 4095.0;
+	
+	lDACword = dac<<2;
+
+	printf("DAC setting:");
+	printf("user %4.3f [pC]",pC);
+	printf("actual %4.3f [pC]",pC_actual);
+	printf(" %4.3f [mV]",mV_actual);
+
+	printf("dac %d [a.u.]",dac);
+	printf("dac %d [a.u.]",lDACword);
+
+
+	printf("\n");
+
+	ftcp->Write(&fRICH_regs->MAROC_Cfg.CTestDac, lDACword);
+	// sleep (3) // for debug
+
+}
+
 void TRich_Frontend::Set_Pulser(float freq, float duty, int count){
 	
 	if(freq <= 0.0){printf("ERROR in %s: freq invalid, setting to 1Hz\n", __FUNCTION__);freq = 1.0;}
@@ -233,7 +270,8 @@ void TRich_Frontend::Set_Pulser(float freq, float duty, int count){
 	
 	ftcp->Write(&fRICH_regs->Sd.PulserNCycles, count);
 	ftcp->Write(&fRICH_regs->Sd.PulserStart, 0);
-	
+
+
 	/* enable pulser -> CTest output */
 
 	// 
@@ -285,23 +323,36 @@ void TRich_Frontend::ConfigureFPGA()
   
   // multievent mode 
   //skipped for the moment
-  //int lblock_nevents  = A->block_nevents;
+  //int lblock_nevents  = A->block_nevents;915:27: war
 
-if(A->pulser_repetition==0){printf("WARNING: Test Pulse is OFF\n");}
-  this->Set_Pulser(A->pulser_freq, A->pulser_dutycycle, A->pulser_repetition);
-  this->SetMask_FPGA_OR(0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF);
-  //this->SetMask_FPGA_OR(0xFFFFFFFF,0xFFFFFFFF,0x0,0x0,0x0,0x0);
- // this->SetMask_FPGA_OR(0x0,0x0,0xFFFFFFFF,0xFFFFFFFF,0x0,0x0);
- // this->SetMask_FPGA_OR(0x0,0x0,0x0,0x0,0xFFFFFFFF,0xFFFFFFFF);
+	if(A->pulser_repetition==0){printf("WARNING: Test Pulse is OFF\n");}
   
+	this->Set_Pulser(A->pulser_freq, A->pulser_dutycycle, A->pulser_repetition);
+
+	this->SetMask_FPGA_OR(0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF);  
 
 	this->ConfigureOutSrc(A->out[0],A->out[1],A->out[2]);
-  this->ConfigureEventBuilder(A->trig_delay);	
-  this->SoftPulseSync();
-  this->Setup_Readout(A->evtbuild_lookback, A->evtbuild_window);
-  this->DisableTrigger(); 
-  this->Fifo_Reset();
   
+  this->DisableTrigger(); 
+
+	this->ConfigureEventBuilder(A->trig_delay);	
+
+  this->Setup_Readout(A->evtbuild_lookback, A->evtbuild_window);
+
+  this->SoftPulseSync();
+
+	this->Fifo_Reset(); // va messo prima di scrivere la DAC di CTest Porco Dio altrimenti la cancella!!!!!
+
+	/* CTest */
+
+	ftcp->Write(&fRICH_regs->Sd.CTestSrc, SD_SRC_SEL_PULSER);
+
+	int trig_delay = 1 ;// [clock ticks unit]
+
+	ftcp->Write(&fRICH_regs->Sd.CTestDelay, trig_delay);
+
+	this->AdjPulseAmplitude(A->pulser_amplitude);
+
   // hw is configured and trigger is disabled 	
 }
 
@@ -317,7 +368,9 @@ void TRich_Frontend::StartDAQ(){// ask Ben about what to put here
 
 	this->CTest(); 
 
+
 	this->TriggerSource(A->trig_source); //Set trig source to pulser when ready to take events 
+	
 
 }
 
@@ -372,7 +425,7 @@ MAROC_Regs TRich_Frontend::Shift(MAROC_Regs regs){
 
 void TRich_Frontend::Print(MAROC_Regs regs){
 
-//printf("Global0 = 0x%08X ", regs.Global0.val);
+	//printf("Global0 = 0x%08X \n", regs.Global0.val);
 
 /*
 	printf("   cmd_fsu           = %d\n", regs.Global0.bits.cmd_fsu);
@@ -408,7 +461,7 @@ void TRich_Frontend::Print(MAROC_Regs regs){
 	printf("   polar_discri      = %d\n", regs.Global0.bits.polar_discri);
 	printf("   inv_discriADC     = %d\n", regs.Global0.bits.inv_discriADC);
 	*/
-//printf("Global1 = 0x%08X ", regs.Global1.val);
+//printf("Global1 = 0x%08X \n", regs.Global1.val);
 /*
 	printf("   d1_d2             = %d\n", regs.Global1.bits.d1_d2);
 	printf("   cmd_CK_mux        = %d\n", regs.Global1.bits.cmd_CK_mux);
@@ -416,17 +469,18 @@ void TRich_Frontend::Print(MAROC_Regs regs){
 	printf("   ONOFF_dac         = %d\n", regs.Global1.bits.ONOFF_dac);
 	printf("   small_dac         = %d\n", regs.Global1.bits.small_dac);
 	printf("   enb_outADC        = %d\n", regs.Global1.bits.enb_outADC);
-	printf("   inv_startCmptGray = %d\n", regs.Global1.bits.inv_startCmptGray);
+	printf("   inv_start
+CmptGray = %d\n", regs.Global1.bits.inv_startCmptGray);
 	printf("   ramp_8bit         = %d\n", regs.Global1.bits.ramp_8bit);
 	printf("   ramp_10bit        = %d\n", regs.Global1.bits.ramp_10bit);
 */	
-	printf("DAC = 0x%08X ", regs.DAC.val);
-	printf("(%4d) ", regs.DAC.val);
+//	printf("DAC = 0x%08X ", regs.DAC.val);
+//	printf("(%4d) \n", regs.DAC.val);
 
-/*
-	printf("   DAC0              = %d\n", regs.DAC.bits.DAC0);
-	printf("   DAC1              = %d\n", regs.DAC.bits.DAC1);
-*/	
+
+//	printf("   DAC0              = %d\n", regs.DAC.bits.DAC0);
+//	printf("   DAC1              = %d\n", regs.DAC.bits.DAC1);
+	
 /*
 	printf("Channels:\n");
 	printf("%7s%7s%7s%7s%7s\n", "CH", "Gain", "Sum", "CTest", "MaskOr");
@@ -442,8 +496,9 @@ void TRich_Frontend::Print(MAROC_Regs regs){
 				   regs.CH[i>>1].bits.Gain1, regs.CH[i>>1].bits.Sum1,
 				   regs.CH[i>>1].bits.CTest1, regs.CH[i>>1].bits.MaskOr1);
 	}
+
+	printf("\n");
 */
-	printf("\n");	
 
 }
 
@@ -524,7 +579,6 @@ void TRich_Frontend::Init(MAROC_Regs *regs,int idx){
 		if(i==0){printf("\n ASIC %d Threshold %d \n",idx,fConfigurator->Threshold());}
 		printf("%4d",gain);
 		if((i%8)==7){printf("\n");}
-
 */
 
 		if(!(i & 0x1))
@@ -603,7 +657,66 @@ void TRich_Frontend::ShiftDyn(MAROC_DyRegs wr, MAROC_DyRegs *rd1, MAROC_DyRegs *
 	
 
 }
+
+
+
+
+
+/* MAROC3A selecting channel 0
+DYNAMIC REGISTER Write All:  0x00000000 0x00000001  [63..32][31..0]
+MAROC[0] READ BACK DYN REG:  0x00000000 0x00000000  [63..32][31..0]
+MAROC[1] READ BACK DYN REG:  0x00000000 0x00000000  [63..32][31..0]
+MAROC[2] READ BACK DYN REG:  0x00000000 0x00000000  [63..32][31..0]
+*/
+
+
+
+/*  MAROC3A selecting channel 1
+
+DYNAMIC REGISTER Write All:  0x00000000 0x00000002  [63..32][31..0]
+MAROC[0] READ BACK DYN REG:  0x00000000 0x00000001  [63..32][31..0]
+MAROC[1] READ BACK DYN REG:  0x00000000 0x00000001  [63..32][31..0]
+MAROC[2] READ BACK DYN REG:  0x00000000 0x00000001  [63..32][31..0]
+
+*/
+
+/*  MAROC3A selecting channel 32
+DYNAMIC REGISTER Write All:  0x00000001 0x00000000  [63..32][31..0]
+MAROC[0] READ BACK DYN REG:  0x00000000 0x80000000  [63..32][31..0]
+MAROC[1] READ BACK DYN REG:  0x00000000 0x80000000  [63..32][31..0]
+MAROC[2] READ BACK DYN REG:  0x00000000 0x80000000  [63..32][31..0]
+*/
+
+
+/* MAROC3  selected channel 0  
+DYNAMIC REGISTER Write All:  0x00000000 0x00000001  [63..32][31..0]
+MAROC[0] READ BACK DYN REG:  0x00000000 0x00000001  [63..32][31..0]
+MAROC[1] READ BACK DYN REG:  0x00000000 0x00000001  [63..32][31..0]
+MAROC[2] READ BACK DYN REG:  0x00000000 0x00000001  [63..32][31..0]
+*/
+
+/* MAROC3  selecting channel 32  
+DYNAMIC REGISTER Write All:  0x00000001 0x00000000  [63..32][31..0]
+MAROC[0] READ BACK DYN REG:  0x00000001 0x00000000  [63..32][31..0]
+MAROC[1] READ BACK DYN REG:  0x00000001 0x00000000  [63..32][31..0]
+MAROC[2] READ BACK DYN REG:  0x00000001 0x00000000  [63..32][31..0]
+
+
+*/
+
 void TRich_Frontend::PrintDyn(MAROC_DyRegs regs){
+	
+	// print brief (channel selector)
+	printf("  0x%08X 0x%08X  [63..32][31..0]\n",regs.Ch32_63_Hold1,regs.Ch0_31_Hold1);
+	// print complete Hold1 and Hold2 (uneused)
+/*
+	printf("0x%08X  0x%08X  HOLD1 ",regs.Ch0_31_Hold1,regs.Ch32_63_Hold1);
+	printf("0x%08X  0x%08X  HOLD2 \n",regs.Ch0_31_Hold2,regs.Ch32_63_Hold2);
+*/
+
+
+// print extended (and clearer for humans)
+/*
 	int i;
 	
 	printf("Channels:\n");
@@ -620,7 +733,7 @@ void TRich_Frontend::PrintDyn(MAROC_DyRegs regs){
 				   (regs.Ch32_63_Hold2>>(i-32)) & 0x1);
 	}
 	printf("\n");
-	
+	*/
 
 }
 void TRich_Frontend::InitDyn(MAROC_DyRegs *regs){
@@ -634,7 +747,7 @@ void TRich_Frontend::InitDyn(MAROC_DyRegs *regs){
 		printf("Warning in %s: bad channel selection ( ch_sel = %d), use default ch_sel = 0 \n",__FUNCTION__,channel);
 		channel=0;
 	}
-	printf("Selected channel is %d  on all the chips\n",channel);				
+	printf("Selected channel on all the chips is %d  \n",channel);				
 
 	int wrd =1;
 	if(channel<=31){
@@ -646,12 +759,73 @@ void TRich_Frontend::InitDyn(MAROC_DyRegs *regs){
 		wrd = wrd << channel;	
 		regs->Ch32_63_Hold1 = wrd;	
 	}
-	//printf("word = 0x%X\n",wrd);
+	printf("word = 0x%X\n",wrd);
 }
 void TRich_Frontend::PrintScaler(const char *name, unsigned int scaler, float ref){
 
 	printf("%-10s %9u %9fHz\n", name, scaler, (float)scaler / ref);
 }
+
+
+TRich_Scaler * TRich_Frontend::DumpScaler(){
+
+	TRich_Scaler * scaler = new TRich_Scaler();
+	int ch,mrc;	
+	unsigned int val;
+	float ref; // time duration, useful for frequency calculation
+
+	// Halt scaler counting 
+	ftcp->Write(&fRICH_regs->Sd.ScalerLatch, 0x1);
+
+	// Read reference time 
+	val = ftcp->Read(&fRICH_regs->Sd.Scaler_GClk125);
+	if(!val)
+	{
+		printf("Error in %s: reference time invalid - scaler normalization incorrect\n", __FUNCTION__);
+		val = 1;
+	}
+	ref = (float)val / 125.0E6;
+
+	// Read data 
+	scaler->GClk125(ftcp->Read(&fRICH_regs->Sd.Scaler_GClk125));
+	scaler->Sync(ftcp->Read(&fRICH_regs->Sd.Scaler_Sync));
+	scaler->Busy(ftcp->Read(&fRICH_regs->Sd.Scaler_Busy));
+	scaler->BusyCycles(ftcp->Read(&fRICH_regs->Sd.Scaler_BusyCycles));
+
+	scaler->Trig(ftcp->Read(&fRICH_regs->Sd.Scaler_Trig));	
+
+	scaler->Input(0,ftcp->Read(&fRICH_regs->Sd.Scaler_Input[0]));
+	scaler->Input(1,ftcp->Read(&fRICH_regs->Sd.Scaler_Input[1]));
+	scaler->Input(2,ftcp->Read(&fRICH_regs->Sd.Scaler_Input[2]));
+	 
+	scaler->Output(0,ftcp->Read(&fRICH_regs->Sd.Scaler_Output[0]));	
+	scaler->Output(1,ftcp->Read(&fRICH_regs->Sd.Scaler_Output[1]));	
+	scaler->Output(2,ftcp->Read(&fRICH_regs->Sd.Scaler_Output[2]));	
+
+	scaler->Or0(0,ftcp->Read(&fRICH_regs->Sd.Scaler_Or1[0]));	
+	scaler->Or0(1,ftcp->Read(&fRICH_regs->Sd.Scaler_Or2[0]));	
+	scaler->Or0(2,ftcp->Read(&fRICH_regs->Sd.Scaler_Or3[0]));	
+
+	scaler->Or1(0,ftcp->Read(&fRICH_regs->Sd.Scaler_Or1[1]));	
+	scaler->Or1(1,ftcp->Read(&fRICH_regs->Sd.Scaler_Or2[1]));	
+	scaler->Or1(2,ftcp->Read(&fRICH_regs->Sd.Scaler_Or3[1]));	
+
+	for(ch = 0; ch < 64; ch++)	{ // loop on channels
+		for(mrc = 0; mrc < 3; mrc++){ // loop on ASICs
+			scaler->Scaler(ch+64*mrc,ftcp->Read(&fRICH_regs->MAROC_Proc[mrc].Scalers[ch]));
+		}	
+	}
+	// Reset Scalers
+	ftcp->Write(&fRICH_regs->Sd.ScalerLatch, 0x2);
+
+	// Enable scaler counting 
+	ftcp->Write(&fRICH_regs->Sd.ScalerLatch, 0x0);
+
+	return scaler;
+} 
+
+
+
 
 long TRich_Frontend::DumpScalers(FILE * outfile,bool printscreen){
 	
@@ -770,7 +944,9 @@ long TRich_Frontend::DumpScalers(FILE * outfile,bool printscreen){
 int TRich_Frontend::Receive(int * valp ){
  
   int n;
-  n = ftcp->Receive(valp);
+  
+	n = ftcp->Receive(valp);
+
   return n;
 }
 
@@ -872,6 +1048,7 @@ unsigned int TRich_Frontend::CheckMAROC()
 	{
 		unsigned int j = i%fnasic;
 		
+
 		MAROC_Regs rd_reg = Shift(fwr_regs[j]);
 
 		err[i] = Cmp(rd_reg,fwr_regs[j]);	
@@ -881,7 +1058,7 @@ unsigned int TRich_Frontend::CheckMAROC()
 
 
 
-	for(unsigned int z = 0;z<fnasic;z++){
+	for(int z = 0;z<fnasic;z++){
 		tot_errors += err[z];
 
 	if(p)	{printf("Error[%d] = %u\n",z,err[z]);}
@@ -893,22 +1070,27 @@ unsigned int TRich_Frontend::CheckMAROC()
 
 unsigned int	TRich_Frontend::Configure(unsigned int nasic)
 {
-	//printf("%s(%d)\n",__FUNCTION__, nasic);
-
 	bool p = false;
+
+	if(p)printf("%s(%d)\n",__FUNCTION__, nasic);
+
+
 
 	unsigned int totshift = 2*nasic;
 	unsigned int tot_errors =0;
 	unsigned int err[totshift];
 	memset(err, 0, sizeof(err));
 
+	// Clear
+	ClearRegs();
+	// Shift
 	for(unsigned int i =0; i<totshift;i++)
 	{
 		unsigned int j = i%nasic;
-		
+
 		MAROC_Regs rd_reg = Shift(fwr_regs[j]);
 
-		err[i] = Cmp(rd_reg,fwr_regs[j]);	
+		err[i] = Cmp(rd_reg,fwr_regs[j]);
 
 		if(p){printf("Shift%d Register%d, Compare ReadBack with Register%d Err[%d] = %d\n",i,j,j,i,err[i]);}
 	}
@@ -924,21 +1106,24 @@ unsigned int	TRich_Frontend::Configure(unsigned int nasic)
 
 bool 	TRich_Frontend::Discovery()
 {
-	printf( "%s...",__FUNCTION__);
-	
+
+	bool dbg = false;
+	if(dbg)printf( "%s...",__FUNCTION__);
+
 	unsigned int err = 0;
 
 	for(unsigned int n =2; n<=3;n++)
 	{
+		if(dbg)printf("Assuming %d MAROC, configuration attempt\n",n);
 		err = Configure(n);
 		if(!err)
 		{
-			fnasic =n; 	
-			printf("Found %d MAROCs\n", fnasic); 
+			fnasic =n; 
+			if(dbg)printf("Found %d MAROCs\n", fnasic);
 			return true;
 		}
 	}
-	printf("Error: 0 MAROC found\n");	
+	if(dbg)printf("Error: 0 MAROC found\n");
 	return false;
 }
 
@@ -946,47 +1131,61 @@ bool 	TRich_Frontend::Discovery()
 
 void TRich_Frontend::StaticReg(int n){
 
-	printf( "%s... \n",__FUNCTION__);
+	bool dbg = false;
+
+	if(dbg)printf( "%s... \n",__FUNCTION__);
 
 	MAROC_Regs wr_regs[n];
 	MAROC_Regs rd_regs[n];
-	
-	// init
-	int i;	
 
-for(i = 0; i < n; i++)
+	// init
+	int i;
+
+	for(i = 0; i < n; i++)
 	{
 		memset(&wr_regs[i], 0, sizeof(MAROC_Regs));
 		Init(&wr_regs[i],i);
 	}
 	// clear
-	printf("Clear All chips\n");
+	if(dbg)printf("Clear All chips\n");
 	this->ClearRegs();
 	// write
 	for(i = n-1; i >= 0; i--)
 	{
-		printf("Shift MAROC %d (         ): ",i);
+		if(dbg)printf("Shift MAROC %d (         ): ",i);
 		Shift(wr_regs[i]);
-		printf("\n");
-}
+		if(dbg)printf("\n");
+	}
+
 	// read back
 	for(i = 0; i < n; i++)
 	{
 		rd_regs[i] = Shift(wr_regs[i]);
-		printf("Shift MAROC %d (Read back): ",i);
+		if(dbg)printf("Shift MAROC %d (Read back): ",i);
 		Print(rd_regs[i]);
-		printf("\n");
+		if(dbg)printf("\n");
 	}
-
-
-
-
 }
 
 unsigned int TRich_Frontend::Cmp(MAROC_Regs reg1,MAROC_Regs reg2)
 {
 
 	bool p = false;// printf enable
+
+ //TEST read and Write
+/*
+	printf("       Write         Read \n");
+	printf("Global0 = 0x%08X 0x%08X\n", reg2.Global0.val,reg1.Global0.val);
+	printf("Global1 = 0x%08X 0x%08X\n", reg2.Global1.val,reg1.Global1.val);
+	printf("DAC     = 0x%08X 0x%08X\n", reg2.DAC.val    ,reg1.DAC.val);
+	for(int i = 0; i < 4; i++)
+	{
+		if( i & 0x1) printf("CH[%2d]  = 0x%08X 0x%08X\n",i, reg2.CH[i>>1].val,reg1.CH[i>>1].val);
+		
+		else printf("CH[%2d]  = 0x%08X 0x%08X\n",i, reg2.CH[i>>1].val,reg1.CH[i>>1].val);
+	}
+*/
+
 
 	if(p){
 	printf("\n %s:\n ",__FUNCTION__);
@@ -1018,10 +1217,11 @@ unsigned int TRich_Frontend::Cmp(MAROC_Regs reg1,MAROC_Regs reg2)
 
 
 void TRich_Frontend::DynReg(int n){
-	
-	printf("%s...\n",__FUNCTION__);
+
 
 	bool p = false;
+
+	if(p)printf("%s...\n",__FUNCTION__);
 
 	MAROC_DyRegs wr_dyn_regs;
 	MAROC_DyRegs rd_dyn_regs[fnasic];
@@ -1030,18 +1230,22 @@ void TRich_Frontend::DynReg(int n){
 
 	ClearRegsDyn();
 
+	// Write (in parallel)
+
 	ShiftDyn(wr_dyn_regs, NULL, NULL, NULL);
+	if(p){
+		printf("DYNAMIC REGISTER Write All:");	
+		PrintDyn(wr_dyn_regs);
+	}
 
-	if(fnasic== 2)
-		ShiftDyn(wr_dyn_regs, &rd_dyn_regs[0], NULL, &rd_dyn_regs[1]);
-	else if(fnasic == 3)
-		ShiftDyn(wr_dyn_regs, &rd_dyn_regs[0], &rd_dyn_regs[1], &rd_dyn_regs[2]);
-
+	// Readback 
+	if(fnasic== 2) ShiftDyn(wr_dyn_regs, &rd_dyn_regs[0], NULL, &rd_dyn_regs[1]);
+	else if(fnasic == 3) ShiftDyn(wr_dyn_regs, &rd_dyn_regs[0], &rd_dyn_regs[1], &rd_dyn_regs[2]);
 
 	if(p){
 		for(int i = 0; i < fnasic; i++)
 		{
-			printf("MAROC ID %d READ BACK DYN REG DUMP:\n", i);
+			printf("MAROC[%d] READ BACK DYN REG:", i);
 			PrintDyn(rd_dyn_regs[i]);
 		}
 	}
@@ -1052,10 +1256,10 @@ void TRich_Frontend::InjErrors()
 	MAROC_Regs fake_reg;
 
 	memset(&fake_reg, 0, sizeof(MAROC_Regs));
-		
+
 	Init(&fake_reg,0);
-	
-	fake_reg.DAC.bits.DAC0 = 17; 
+
+	fake_reg.DAC.bits.DAC0 = 17;
 
 	printf("Inj Errors\n");
 	Shift(fake_reg);
@@ -1064,7 +1268,7 @@ void TRich_Frontend::InjErrors()
 
 
 void TRich_Frontend::ConfigureMAROC(){
-  	
+
 	printf("%s...\n",__FUNCTION__);
 
 	Init(&fwr_regs[0],0);
@@ -1074,8 +1278,9 @@ void TRich_Frontend::ConfigureMAROC(){
 	ClearRegs();
 
 	Discovery();
-
+//	fnasic=3;
+	//if(fnasic==0) return;
 	StaticReg(fnasic);
-	
+
 	DynReg(fnasic);
 }

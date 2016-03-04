@@ -47,8 +47,8 @@ public:
 	TRich_ConnectTCP();
 	~TRich_ConnectTCP();
 	
-       	bool OpenSocket_Event(const char * IPaddr=0,int port=0);
-  	bool OpenSocket_Reg(const char * IPaddr=0,int port=0);
+  bool OpenSocket_Event(const char * IPaddr=0,int port=0);
+  bool OpenSocket_Reg(const char * IPaddr=0,int port=0);
 	
 	bool Close();
 

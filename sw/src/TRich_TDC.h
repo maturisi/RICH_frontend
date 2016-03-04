@@ -10,6 +10,7 @@
  *  and can record the time difference between consecutive triggers
  *  provides an output interface to ROOT structures 
  *
+ *  Firmware version of May '15 	
  *	Latest revision 2015, June 25
  *
  *	Matteo Turisini matteo.turisini@gmail.com
@@ -33,49 +34,60 @@ class TRich_TDC {
 	
 private:
 	
-	/* fw version of May '15*/
-	/* Device ID	*/unsigned int	fdid;
-	/* Event ID		*/unsigned int	ftid;
-	/* TimeStamp0	*/unsigned int	fts0; 
-	/* TimeStamp1	*/unsigned int	fts1; 
-	/* Edges List	*/std::vector<RICH_tdc_edge_t> fEdgeList; 
+	/* Device ID	*/ unsigned int	fdid;
+	/* Event ID		*/ unsigned int	ftid;
+	/* TimeStamp0	*/ unsigned int	fts0; 
+	/* TimeStamp1	*/ unsigned int	fts1; 
+	/* Edges List	*/ std::vector<RICH_tdc_edge_t> fEdgeList; 
 
 	int ftotEvents;
 	
-	/* analysis during parsing (for event tagging)*/	
-	int			fposc; // positive edges counter
-	int			fnegc; // negative edges counter
-	
-	double			fts_sec; // time interval between consecutive triggers
-	
-	/*  Root class handler */
+	/* Positive edges counter          */ int			fposc; 
+	/* Negative edges counter          */ int			fnegc; 	
+	/* Time between consecutive events */ double	fts_sec; 
+
+
+	/*  ROOT classes interfaces */
 	TFile *			ffile;
 	TTree *			ftree;
-	
-	/* variables associated to the TTree */
 	UInt_t			fnedge;
 	UInt_t			fpolarity[MAX_EDGE]; // 0 rising; 1 falling
 	UInt_t			fchannel[MAX_EDGE]; //[0..192 ]
 	UInt_t			ftime[MAX_EDGE]; // delay from trigger (range depends on configuration)
-		
-
 
 
 public:
-	TRich_TDC(const char * outname = NULL);
-	~TRich_TDC();
+								TRich_TDC(const char * outname = NULL);
+								~TRich_TDC();
 
-	void			Reset();
+	void					Reset();
 	unsigned int	TrigNum	(int tid=-1);
 	unsigned int	DevId	(int did=-1);
 	unsigned int	Tstamp	(char tag,int time=-1);	
+	double				DecodeTimeStamp();  /* merge the 2 x 32 bit words (private members fts1,fts0) in a single timestamp in seconds*/		
+	void					Edge	(unsigned int chan = 0,unsigned int time = 0, unsigned int edge =0);
 
-	void			Edge	(unsigned int chan = 0,unsigned int time = 0, unsigned int edge =0);
+	int						Process();
+	int						Fill();
+	void 					Print(	int verbosity=0, unsigned int channel=0);
+	void 					EdgeList();
 
-	int				Process();
-	
+	void					Write(); // save ftree in the current (to be called after parsing to store raw data)
+
+
+/* Reading part*/
+
+	bool 					OpenFile(const char * filename = NULL);
+	int 					RetrieveTree();
+	bool 					GetEntry(int entryID);
+	unsigned int 	NEdges();	
+
+	unsigned int 	Polarity(unsigned int edge);
+	unsigned int 	Time(unsigned int edge);
+	unsigned int 	Channel(unsigned int edge);
+
 private:
-	double			DecodeTimeStamp();/* encode the 2 x 32 bit words (private members fts1,fts0) in a single timestamp in seconds*/
+
 };
 
 #endif

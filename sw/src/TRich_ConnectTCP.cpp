@@ -29,29 +29,36 @@ TRich_ConnectTCP::~TRich_ConnectTCP(){
 
 int TRich_ConnectTCP::Receive(int * valp){
 
+
+	bool dbg = false;
 	int err;
   int val; 
-  int n = recv(fsockfd_event, &val, sizeof(val), MSG_WAITALL);
+  int n ;
+
+	n = recv(fsockfd_event, &val, sizeof(val), MSG_WAITALL);
+
 	err = errno;
-	//printf(" TCP Receive  %d bytes (%d expected) content is %ld (0x%X)\n",n,sizeof(val),val,val);
+
   *valp = val;
+
+	//printf(" TCP Receive  %d bytes (%d expected) content is %ld (0x%X)\n",n,sizeof(val),val,val);
   //printf(" TCP Receive 0x%X  and pass 0x%X \n",val,*valp);
 
-	if(n< 0){     
-//	if ((err == EAGAIN) || (err == EWOULDBLOCK))
-  	
-	if (err == EWOULDBLOCK){
-          printf("non-blocking operation returned EWOULDBLOCK\n");
-					sleep(1);
-       }
-       else
-       {
-          printf("recv returned unrecoverable error(errno=%d)\n", err);
-         // break;
-       }
-    }        
+	if(dbg)printf(" TCP Receive 0x%08X \n",val);
 
-return n;
+
+	if(n< 0){     
+		if (err == EWOULDBLOCK){
+    	if(dbg)printf("non-blocking operation returned EWOULDBLOCK\n");
+			usleep(1000);
+    }
+    else
+    {
+    	printf("recv returned unrecoverable error(errno=%d)\n", err);
+         // break;
+     }
+	}        
+	return n;
 }
 
 
