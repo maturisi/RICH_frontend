@@ -20,6 +20,9 @@
 #define SINGLE_RUN 0
 #define SCAN 1
 
+#define PDFPATH  ("../../pdf/")
+#define HISTOPATH  ("../../histo/")
+
 
 using namespace std;
 
@@ -44,7 +47,7 @@ private:
   std::string frun_file;
   std::string frun_name;
 	std::string frun_prefix; 
-  int		 frun_id;	
+	int		 frun_id;	
 	std::string frun_suffix; 
 
 	std::string fTDCroot;
@@ -64,18 +67,11 @@ private:
   std::string finlog;
   std::string fintxt;
   std::string fioTDCroot; 
-	std::string fioTDCtrigger; 
+
 
   std::string fioSKAroot_Scan;
   std::string fprefix;
- // std::string fPlotTimeStamp;
- // std::string fPlotTimeStampIntervals;
-  
- // std::string fPlotChannel; // temporary, the name must change 
- // std::string fPlotEdge; // ...same
- // std::string fPlotTime; //..same
-  //std::string fPlotTime_SingleChannel;
-  
+
  
   int fposedge[192];	// equivalent of scaler 
   double feff[192];		// counts/nevents
@@ -93,9 +89,6 @@ private:
 
 	bool Scan();
 
-
-
-
 	std::string inPath(){return frun_path;}
 	std::string inPrefix(){return frun_prefix;}
 
@@ -111,7 +104,7 @@ private:
   unsigned int	GetEventBuilderLookBack();	
   unsigned int	GetEventBuilderWindow();
   unsigned int	GetGain();
-
+	unsigned int GetPolarDiscri();
 	
   
   double GetEfficiency(int channel = 0);	
@@ -119,7 +112,12 @@ private:
   // TDC
   int		TDC_Read();
 	void 	TDC_Spectra();
-	void 	Plot(); // NEW 3 mARCH 2016
+	void 	Plot(); 
+	
+	void  TDC_SpectraSingleChannel();
+	void 	TDC_PlotSingleChannel(); 	
+	void 	TDC_GetSingleChannel();
+	
 	
 	void 	ProcessTDC();
 	void 	ProcessTDCTEMP(); // BACK UP copy during sw update

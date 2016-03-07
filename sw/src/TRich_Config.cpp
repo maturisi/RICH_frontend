@@ -38,6 +38,7 @@ TRich_Config::TRich_Config(){
   fSKA_duration=-1; 
   fSKA_repetition=-1;
 
+	fpolar_discri =-1;
   
   fthreshold_default =-1;
   fgain_default=-1;
@@ -741,6 +742,7 @@ void TRich_Config::Read_Settings_MAROC_Common(){
 		
 		fgain_default = fmp.gain;
 		fthreshold_default = fmp.DAC0;
+		fpolar_discri = fmp.polar_discri;
 
 	}
 	catch (const SettingNotFoundException &nfex) {
@@ -748,6 +750,14 @@ void TRich_Config::Read_Settings_MAROC_Common(){
 	}
 }
 
+
+unsigned int TRich_Config::GetPolarDiscri(){
+
+ 
+  if(fpolar_discri==-1) this->Read_Settings_MAROC_Common();
+  
+  return fpolar_discri;
+}
 
 
 void TRich_Config::Retrieve_Settings_MAROC(int idx){
@@ -771,7 +781,6 @@ void	TRich_Config::Print(){
 	this->PrintMAROC_StaticReg();
 	this->PrintMAROC_DynamcReg();
 	this->PrintMAROC_adj();
-//	this->PrintEXTERNAL_Pulser();
 
 }
 void TRich_Config::PrintRUN(){

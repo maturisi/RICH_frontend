@@ -42,6 +42,7 @@ class TRich_Config {
   string  fnote;
   int	  fthreshold_default;
   int	  fgain_default;
+  int fpolar_discri;
   
   int	  fdaqmode;	
   int	  fEv_preset;
@@ -169,6 +170,7 @@ class TRich_Config {
   int	GetLogNEvents(); 
   float	GetLogNSeconds();
   void	Retrieve_Settings_MAROC(int idx=0);
+  unsigned int GetPolarDiscri();
   
   unsigned int GetTriggerDelay();
   unsigned int GetEventBuilderLookBack();

@@ -131,20 +131,25 @@ int main(int argc, char *argv[]){
 			
 			if(runID==-2){printf("Error with run ID\n");break;}
 		
-			A.Ingest(); // parse .bin into root file
+			//A.Ingest(); // parse .bin into root file
 
 			if(A.SingleRun()){
-				A.TDC_Spectra();
-				A.Plot();
+				// board
+			//	A.TDC_Spectra();
+			//	A.Plot();
+				
+				// single channel
+				A.TDC_SpectraSingleChannel();
+				A.TDC_PlotSingleChannel();
+				//A.TDC_GetSingleChannel();
+				
 				//A.ProcessTDC(); // new! man at work // add histogram to rootfile				
 				//A.ProcessTDCTEMP();// old
 			}
 			if(A.Scan()){
 				A.ProcessTDCscan();
 			}
-
-
-  			break;
+			break;
   		default:
     			printf("Error in %s: Unknown daq_mode",__FUNCTION__);
     		break;

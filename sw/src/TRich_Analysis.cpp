@@ -44,6 +44,7 @@
 #define HEVTTIME "triggerTIME"
 #define HEVTFREQ "triggerFREQ"
 #define HEVTEDGE "nedges_SCAT"
+#define H_NEDGES "nedges_DISTRIB"
 #define HBRDRISE "riseTIME"
 #define HBRDFALL "fallTIME"
  
@@ -77,7 +78,7 @@ TRich_Analysis::TRich_Analysis(const char * fileraw){
   finlog = "";
   fintxt = "";
   fioTDCroot = "";
-fioTDCtrigger = "";
+
   fioSKAroot_Scan = "unknown_name_for_threshold_scan_root_file";
   fprefix = "";
  // fPlotTimeStamp = "";
@@ -694,8 +695,6 @@ int	TRich_Analysis::NameRun(const char * fileraw,int runID_last,bool enablePrint
   }
   fioTDCroot = "../../data/parsed/" + frun_name + "_TDC" + ".root";
 
-	fioTDCtrigger = "../../histo/" + frun_name + "_histo" + ".root";
-
   return 	frun_id;
 }
 
@@ -734,6 +733,19 @@ unsigned int TRich_Analysis::GetGain(){
 
 
 
+unsigned int TRich_Analysis::GetPolarDiscri(){
+  
+  TRich_Config cfg; 
+  
+  cfg.ParseFile(finlog.c_str());
+  
+  cfg.Read(); // import configuration data
+  
+  return cfg.GetPolarDiscri();
+	
+}
+
+
 unsigned int TRich_Analysis::GetFPGAParameters(int opt){
   
   unsigned int ret=-1;
@@ -757,18 +769,9 @@ unsigned int TRich_Analysis::GetFPGAParameters(int opt){
 }
 
 
-unsigned int TRich_Analysis::GetTriggerDelay(){
-  unsigned int ret = this->GetFPGAParameters(0);
-  return ret;
-}
-unsigned int TRich_Analysis::GetEventBuilderLookBack(){
-  unsigned int ret =	this->GetFPGAParameters(1);
-  return ret;
-}	
-unsigned int TRich_Analysis::GetEventBuilderWindow(){
-  unsigned int ret =	this->GetFPGAParameters(2);
-  return ret;
-}
+unsigned int TRich_Analysis::GetTriggerDelay(){return GetFPGAParameters(0);}
+unsigned int TRich_Analysis::GetEventBuilderLookBack(){return GetFPGAParameters(1);}	
+unsigned int TRich_Analysis::GetEventBuilderWindow(){return GetFPGAParameters(2);}
 
 
 
@@ -1280,29 +1283,49 @@ hTRiseCh[i] = new TH1F(Form("ch%03dTRise",i),"",timmax-timmin,timmin-0.5,timmax-
 
 */
 }
-
-
-
 void TRich_Analysis::Plot(){
 
+	std::string infile  = HISTOPATH + frun_name + "_histo" + ".root";
+	std::string outfile = PDFPATH   + frun_name + "_global" + ".pdf";
+	
+	const char * p =  outfile.c_str();
+	
 	TCanvas * c = new TCanvas("c");
-	const char * out_file = "../../pdf/Pippo.pdf";
+	
+	c->Print(Form("%s[",p)); 
 
-	TFile f(fioTDCtrigger.c_str());
+	TFile f(infile.c_str(),"READ"); 
+	
 	TH1F * h = NULL;
-	h = (TH1F*) f.Get(HEVTTIME); if(h!=NULL){h->Draw(); c->Print(Form("%s(",out_file),"Title:Trigger Time"); h=NULL;}
-	h = (TH1F*) f.Get(HEVTFREQ); if(h!=NULL){h->Draw(); c->SetLogx(1);c->Print(Form("%s",out_file),"Title:Trigger Frequency"); h=NULL;}
-	h = (TH1F*) f.Get(HEVTEDGE); if(h!=NULL){h->Draw(); c->SetLogx(0);c->Print(Form("%s",out_file),"Title:Edges Multiplicity"); h=NULL;}
-	h = (TH1F*) f.Get(HBRDRISE); if(h!=NULL){h->Draw(); c->SetLogy(1);c->Print(Form("%s",out_file),"Title:Rise Time"); h=NULL;}
-	h = (TH1F*) f.Get(HBRDFALL); if(h!=NULL){h->Draw(); c->SetLogy(1);c->Print(Form("%s)",out_file),"Title:Fall Time"); h=NULL;}
+	h = (TH1F*) f.Get(HEVTTIME); 
+	if(h!=NULL){h->Draw(); c->Print(Form("%s",p)); h=NULL;}
+	
+	h = (TH1F*) f.Get(HEVTFREQ); 
+	if(h!=NULL){h->Draw(); c->SetLogx(1);c->Print(Form("%s",p)); h=NULL;}
+	
+	h = (TH1F*) f.Get(HEVTEDGE); 
+	if(h!=NULL){h->Draw(); c->SetLogx(0);c->Print(Form("%s",p)); h=NULL;}
+	
+	h = (TH1F*) f.Get(H_NEDGES); 
+	if(h!=NULL){h->Draw(); c->SetLogx(0);c->Print(Form("%s",p)); h=NULL;}
+	
+	h = (TH1F*) f.Get(HBRDRISE); 
+	if(h!=NULL){h->Draw(); c->SetLogy(1);c->Print(Form("%s",p)); h=NULL;}
+	
+	h = (TH1F*) f.Get(HBRDFALL); 
+	if(h!=NULL){h->Draw(); c->SetLogy(1);c->Print(Form("%s",p)); h=NULL;}
+
+	c->Print(Form("%s]",p)); 
 
 	f.Close();	
 	delete c;
 
-	printf("Plots File %s\n ",out_file);
+	printf("Plots File %s\n ",p);
 }
 
-// Process parsed data in fioTDCroot, creates histograms and save them in fioTDCtrigger
+
+
+// Process parsed data (.root), creates histograms and save them in (_histo.root)
 
 // First loop is for fixed x-range plots while the  second loop variable range ones (e.g. edges distribution) 
 
@@ -1317,6 +1340,8 @@ void TRich_Analysis::Plot(){
 
 void 	TRich_Analysis::TDC_Spectra(){
 
+	std::string outfile  = HISTOPATH + frun_name + "_histo" + ".root";
+
 	unsigned int event, nedge, channel, polarity, time,nedge_max=0;
 	double etime, dt, etime_prev=0.0;
 	bool dbg,ok;
@@ -1326,16 +1351,17 @@ void 	TRich_Analysis::TDC_Spectra(){
   int timmin = 0;
 	
 	TRich_TDC * tdc = new TRich_TDC();
-	ok = tdc->OpenFile(fioTDCroot.c_str()); 	if(!ok) return;
+	ok = tdc->OpenFile(fioTDCroot.c_str()); 
+	if(!ok) return;
 	entries = tdc->RetrieveTree();
 
-	TFile * out_file 	= new TFile(fioTDCtrigger.c_str(),"RECREATE"); 
-  TH1F * trigger 		= new TH1F(HEVTTIME,"",entries				,-0.5				,entries-0.5);
-	TH1F * frequency  = new TH1F(HEVTFREQ,"",1E6		 				,-0.5				,	   1E6-0.5);	
-  TH1F * edge 	 		= new TH1F(HEVTEDGE,"",entries				,-0.5				,entries-0.5);
-  TH1F * rise 			= new TH1F(HBRDRISE,"",timmax-timmin	,timmin-0.5	, timmax-0.5);
-  TH1F * fall 			= new TH1F(HBRDFALL,"",timmax-timmin	,timmin-0.5	, timmax-0.5);
-
+	TFile * out_file 	= new TFile(outfile.c_str(),"RECREATE"); 
+	
+  TH1F * trigger 	= new TH1F(HEVTTIME,"",entries			,-0.5				,entries-0.5);
+	TH1F * frequency= new TH1F(HEVTFREQ,"",1E6		 			,-0.5				,	1E6-0.5);	
+  TH1F * edge 	 	= new TH1F(HEVTEDGE,"",entries			,-0.5				,entries-0.5);
+  TH1F * rise 		= new TH1F(HBRDRISE,"",timmax-timmin,timmin-0.5	, timmax-0.5);
+  TH1F * fall 		= new TH1F(HBRDFALL,"",timmax-timmin,timmin-0.5	, timmax-0.5);
 
 	for(int e=0; e<entries; e++){
 		dbg = (e%(entries/10)==0) ? true : false;
@@ -1373,10 +1399,11 @@ void 	TRich_Analysis::TDC_Spectra(){
 	delete frequency;
 	delete rise;
 	delete fall;
-/*
+
 	// second loop is for adjustable x-axis range
 	//	printf("Max edges = %u, take %d\n",nedge_max,(int)(nedge_max*1.1));
-  TH1F * edgeD = new TH1F("Nedges_DISTRIB","",(int)(nedge_max*1.1),-0.5,((int)(nedge_max*1.1))-0.5);
+  int nbin = nedge_max*2.0;
+  TH1F * edgeD = new TH1F(H_NEDGES,"",nbin,-0.5,nbin-0.5);
 	for(int e=0; e<entries; e++){
 		dbg = (e%(entries/10)==0) ? true : false;
 		tdc->Reset();
@@ -1387,11 +1414,209 @@ void 	TRich_Analysis::TDC_Spectra(){
 	}
 	edgeD->Write();
 	delete edgeD;
-*/	
+
   out_file->Close();
 	delete out_file;
 	delete tdc;
-	printf("Histograms saved in %s\n",fioTDCtrigger.c_str());
+	printf("Histograms saved in %s\n",outfile.c_str());
+}
+
+void 	TRich_Analysis::TDC_SpectraSingleChannel(){
+
+// to do correlazione time of the edge vs duration
+
+	std::string outfile  = HISTOPATH + frun_name + "_histosingle" + ".root";
+
+	unsigned int nedge, channel, polarity, time,channel2, polarity2, time2;
+	bool dbg,ok;
+	int entries,duration;
+  unsigned int lwindow	= this->GetEventBuilderWindow(); // clock ticks [8ns]
+  int t2 = 8*lwindow; // ns
+  int t1 = 0;
+  
+  int d1 = -100;
+  int d2 = 100;
+  //int polar_discri = this->GetPolarDiscri();
+  //printf("Polar Discri = %u\n",polar_discri);// =1 LEADING EDGE is the falling
+
+	TRich_TDC * tdc = new TRich_TDC();
+	ok = tdc->OpenFile(fioTDCroot.c_str());  if(!ok) return;
+	entries = tdc->RetrieveTree();
+
+	TFile * out_file 	= new TFile(outfile.c_str(),"RECREATE"); 
+ 	
+ 	int nchannels = 192;
+ 	
+ 	TH1F * rise[nchannels];	
+  TH1F * fall[nchannels];
+  TH1F * dura[nchannels];
+
+	for (int i=0; i<nchannels; i++) {
+		rise[i] = new TH1F(Form("ch%03d_rise",i),"",t2-t1,t1-0.5,t2-0.5);
+    fall[i] = new TH1F(Form("ch%03d_fall",i),"",t2-t1,t1-0.5,t2-0.5);
+    dura[i] = new TH1F(Form("ch%03d_dura",i),"",d2-d1,d1-0.5,d2-0.5);
+  }
+  
+	for(int e=0; e<entries; e++){
+		dbg = (e%(entries/10)==0) ? true : false;
+		tdc->Reset();
+		tdc->GetEntry(e);// event ID (header data) + edge list
+		nedge = tdc->NEdges();	
+		for(unsigned int edge=0;edge<nedge;edge++){ // edge list
+			channel 	= tdc->Channel(edge);
+			polarity 	= tdc->Polarity(edge);
+			time 			= tdc->Time( edge);
+		 	switch (polarity) {
+      	case 0:rise[channel]->Fill(time);break;
+      	case 1:fall[channel]->Fill(time);break;
+      	default: printf("Error in %s: unknown edge polarity %d\n",__FUNCTION__,polarity);break;
+      }
+      // hit reconstruction
+      duration=0;
+      // scan the edge list looking for an edge of opposite polarity for the same channel and calculate the time over threshold 
+      for (unsigned int j=edge+1; j<nedge; j++){
+      	channel2 = tdc->Channel(j);
+      	if(channel2==channel){
+      		polarity2= tdc->Polarity(j);
+      		if(polarity2!=polarity){
+      			time2 = tdc->Time(j);
+      			duration = time2-time;//to b improved,add checks t1>t2, polar discri
+						dura[channel]->Fill(duration);
+      		}
+      	}
+      }
+		}
+	}
+	for (int i=0; i<nchannels; i++) {
+	
+		rise[i]->Write();
+		fall[i]->Write();
+		dura[i]->Write();
+		delete rise[i];
+		delete fall[i];
+		delete dura[i];	
+  }
+  
+  out_file->Close();
+	delete out_file;
+	delete tdc;
+	printf("Histograms saved in %s\n",outfile.c_str());
+}
+
+
+void TRich_Analysis::TDC_GetSingleChannel(){
+
+// Get Efficiency, Mean and RMS
+
+	std::string infile  = HISTOPATH + frun_name + "_histosingle" + ".root";
+	//std::string outfile = PDFPATH   + frun_name + "_single" + ".txt";
+	//const char * p =  outfile.c_str();
+	
+	TFile f(infile.c_str(),"READ"); 
+	
+	TH1F * hrise = NULL;
+	TH1F * hfall = NULL;
+	
+	int nchannels = 192;
+		
+	const int k = 3; // 0 = rise, 1 =  fall, 2 = duration
+	double counts[k]; 
+	double mean[k];
+	double rms[k];		
+		
+	for(int i =0; i<nchannels; i++){
+		
+		hrise = (TH1F*) f.Get(Form("ch%03d_rise",i)); 
+		hfall = (TH1F*) f.Get(Form("ch%03d_fall",i)); 
+
+		if(hfall!=NULL&&hrise!=NULL){
+
+			counts[0] = hfall->GetEntries();
+			mean[0] = hfall->GetMean();
+			rms[0] = hfall->GetRMS();
+	
+			counts[1] = hrise->GetEntries();
+			mean[1] = hrise->GetMean();
+			rms[1] = hrise->GetRMS();
+			
+			/*
+			if(counts[0]){
+				printf("CH%3d",i);
+				printf("ENTRIES %.3lf MEAN %.3lf RMS %.3lf ",counts[0],mean[0],rms[0]);
+				printf("EFF %.3lf MEAN %.3lf RMS %.3lf",counts[1],mean[1],rms[1]);
+				printf("\n");	
+			}
+			*/
+		}
+	}
+	f.Close();	
+}
+
+void TRich_Analysis::TDC_PlotSingleChannel(){
+
+	std::string infile  = HISTOPATH + frun_name + "_histosingle" + ".root";
+	std::string outfile = PDFPATH   + frun_name + "_single" + ".pdf";
+	const char * p =  outfile.c_str();
+	const char * canvname = "c";
+	int rows = 1;
+	int columns = 2;
+	int padsize = 200;
+	int padmargin = 10.; //%	
+	int sizex = columns *padsize;
+	int sizey = rows * padsize;
+	TCanvas * c = new TCanvas(canvname,"",sizex,sizey);
+	c->Print(Form("%s[",p)); 
+	c->Divide(columns,rows);
+	const int NPAD = columns*rows;
+	TPad * pad[NPAD];
+	float padm = padmargin/100.; 	
+	for(int p=0;p<NPAD;p++){
+		pad[p]=(TPad*)(c->FindObject(Form("%s_%d",canvname,p+1)));	
+		pad[p]->cd();
+  	pad[p]->SetGrid(kTRUE);
+		pad[p]->SetLogx(kFALSE);
+		pad[p]->SetLogy(kFALSE);
+		pad[p]->SetMargin(padm,padm,padm,padm); // left, right, bottom, top
+	}
+
+	TFile f(infile.c_str(),"READ"); 
+	
+	TH1F * hrise = NULL;
+	TH1F * hfall = NULL;
+	TH1F * hdura = NULL;
+	
+	int nchannels = 192;
+	double max = 10000*2.;
+	double min = 1.;
+	
+	for(int i =0; i<nchannels; i++){
+		
+		hrise = (TH1F*) f.Get(Form("ch%03d_rise",i)); 
+		hfall = (TH1F*) f.Get(Form("ch%03d_fall",i)); 
+		pad[0]->cd()->SetLogy(1);		
+		if(hfall!=NULL&&hrise!=NULL){
+			hfall->SetLineColor(kRed);
+			hrise->SetLineColor(kBlue);		
+			hfall->SetMaximum(max);
+			hfall->SetMinimum(min);
+			hfall->Draw();
+			hrise->Draw("SAME");
+		}
+		
+		hdura = (TH1F*) f.Get(Form("ch%03d_dura",i)); 
+		pad[1]->cd()->SetLogy(1);	
+		if(hdura!=NULL){
+			hdura->SetMaximum(max);
+			hdura->SetMinimum(min);
+			hdura->SetLineColor(kMagenta);		
+			hdura->Draw();
+		}
+		c->Print(Form("%s",p)); 
+	}
+	c->Print(Form("%s]",p)); 
+	f.Close();	
+	delete c;
+	printf("Single Channel Time Spectra in %s\n ",p);
 }
 
 
@@ -2059,7 +2284,7 @@ void 	TRich_Analysis::ProcessTDCTEMP(){ // BACK UP copy during sw update
 			delete hch[i];
 		}
 		if(hpx[i]){
-  gStyle->SetOptStat(0);	 
+  		gStyle->SetOptStat(0);	 
 			hpx[i]->Draw("COLZ");
 			mycanv->Print(Form("%s",fTDCpdf.c_str()));
 			delete hpx[i];
