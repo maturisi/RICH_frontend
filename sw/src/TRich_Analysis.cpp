@@ -38,6 +38,7 @@
 #include "TRich_Scaler.h"
 #include "TRich_TDC.h"
 #include "TRich_Adapter.h"
+#include "TRich_Calib.h"
 
 #define SIZEOFCANV 200
 
@@ -47,6 +48,11 @@
 #define H_NEDGES "nedges_DISTRIB"
 #define HBRDRISE "riseTIME"
 #define HBRDFALL "fallTIME"
+
+#define TEXT	 0
+#define UNIF	 1
+#define PIXEL	 2
+
  
 
 
@@ -131,7 +137,7 @@ bool TRich_Analysis::SingleRun(){
   return ret;
 }
 bool TRich_Analysis::Scan(){
-  
+
   bool ret = (fmode == SCAN) ? true :false;
   return ret;
 }
@@ -268,337 +274,473 @@ int TRich_Analysis::SetNames(std::string runPrefix,int runID_first,int runID_las
 
 void TRich_Analysis::Ingest(){
 
+	int nevt;
+	
 	printf("%s...\n",__FUNCTION__);
 	fflush(stdout);
-  bool p = false;
-  
-	// single run variables
-  int gain;
-	int thr;
-	int runID;
-	int nevt;
-	int totEvents;
-	
-	Float_t riseEdges[192];
-	Float_t riseMean[192];
-	Float_t riseRMS[192];
 
-	Float_t fallEdges[192];
-	Float_t fallMean[192];
-	Float_t fallRMS[192];
+	std::string fileroot;
+  std::string filelog;
+  std::string fileraw;
+ 
 
-
-  	std::string fileroot;
-  	std::string filelog;
-  	std::string fileraw;
-  	char strID[7];
-  
-  	TFile * lfile;
-  	TTree * ltree;
-  
-  	TFile * lscanfile;
-  	TTree * lscantree;
-  	TH1F * 	lhRise;
-	TH1F * 	lhFall; 
-  
-
-  	Double_t mean, rms,eff;
-  
-  	char lhname[10];
-  	char lhfallname[10];
-
-  	TRich_Config cfg;
+  TRich_Config cfg;
 
 	switch (fdaq_mode) {
-  		case 0: // scaler ...
-   		break;
+  		
+		case 0: // SCALER 
+   	break;
   
 		case 1: // TDC
     	switch(fmode){
-
-	  		case SINGLE_RUN:
-										
+				case SINGLE_RUN:
 				nevt = this->TDC_Read(); // parse single run, writing an output Ttree with Time stamp and edge list
-
+				printf("Read Single Run Returns %d\n",nevt);
       	break;
     
-			case SCAN:
-			//	printf(" %s SCAN MODE\n",__FUNCTION__);
-      	lscanfile = new TFile(fTDCscanroot.c_str(),"RECREATE");
-				if(lscanfile->IsOpen()){
-					printf("File %s opened succesfully\n",fTDCscanroot.c_str());
-					lscantree = new TTree("TDCscandata","Calibration data, threshold gain scan");
-					lscantree->Branch("gain"			,&gain		,"gain/i");		
-					lscantree->Branch("threshold" ,&thr		,"thr/i");		
-					lscantree->Branch("runID" ,&runID		,"runID/i");	
-					lscantree->Branch("totEvents" ,&totEvents		,"totEvents/i");	
+				case SCAN:
+				this->TDC_Scan_Read(); // extract single run statistics and create a tree dedicated to scans
+				break;				
 
-  				lscantree->Branch("nRise",riseEdges,"riseEdges[192]/F");
-  				lscantree->Branch("tRise",riseMean,"riseMean[192]/F");
-  				lscantree->Branch("dtRise",riseRMS,"riseRMS[192]/F");
-
-  				lscantree->Branch("nFall",fallEdges,"fallEdges[192]/F");
-  				lscantree->Branch("tFall",fallMean,"fallMean[192]/F");
-  				lscantree->Branch("dtFall",fallRMS,"fallRMS[192]/F");
-      			}
-      			//printf("LOOP ON FILES looking for histos\n");
-     		 	for(int r=fTDC_runID_first;r<=fTDC_runID_last;r++){
-				gain=0;
-				thr =0;
-				runID =0;
-				totEvents =0;
-			
-				for(int i=0;i<192;i++){
-					riseEdges[i]=.0;
-					riseMean[i]=.0;
-					riseRMS[i]=.0;
-					fallEdges[i]=.0;
-					fallMean[i]=.0;
-					fallRMS[i]=.0;
-				}
-				printf("RUN %3d ",r);
-				sprintf(strID, "%06d",  r);
-				fileraw = frun_path + frun_prefix + strID + ".bin";
-						
-				this->NameRun(fileraw.c_str());
-
-				thr = this->GetThreshold();
-				printf("THR %4d ",thr);
-				gain = this->GetGain();
-				printf("GAIN %4d ",gain);
-				runID =r;
-				fTDCroot = "../../data/parsed/" + frun_name + "_TDC" + ".root";
-						
-				printf("fileroot[%3d] = %s ",r,fTDCroot.c_str());
-						
-				lfile = new TFile(fTDCroot.c_str());
-				if(lfile->IsZombie()){printf("pFile is Zombie!\n");}
-				if(lfile->IsOpen()){
-	  				//printf("File %s is open\n",fTDCroot.c_str());
-	  				//lfile->GetListOfKeys()->Print();
-	  				ltree = (TTree*)lfile->Get("TDCdata"); 
-	  				nevt = ltree->GetEntries();
-	  				printf(" N trigger= %d",nevt);
-	  				printf("\n");
-					totEvents = nevt;	
-	  				for(int ch=0;ch<192;ch++){
- 						sprintf(lhfallname,"ch%03dTFall",ch);
-	    					sprintf(lhname,"ch%03dTRise",ch);
-	    					mean = .0;
-	    					rms = .0;
-	   					eff = .0;
-	    					lhRise = NULL;
-						lhFall = NULL;
-	    					lhRise = (TH1F*) lfile->Get(lhname);
-						if(lhRise){
-	      						mean = lhRise->GetMean();
-	      						rms  = lhRise->GetRMS();
-	      						eff  = 1*lhRise->GetEntries()/nevt;
-							riseEdges[ch]= lhRise->GetEntries();
-							riseMean[ch]= mean;
-							riseRMS[ch]= rms;
-							if(p){printf("\tCH_%d_%2d RISE (Mean %4.0lf RMS %6.3lf Eff %.3lf) ",ch/64,ch%64,mean,rms,eff);}
-	    					}	
-						lhFall = (TH1F*) lfile->Get(lhfallname);
-						if(lhFall){
-	      						mean = lhFall->GetMean();
-	      						rms  = lhFall->GetRMS();
-	      						eff  = 1*lhFall->GetEntries()/nevt;
-							fallEdges[ch]= lhFall->GetEntries();
-							fallMean[ch]= mean;
-							fallRMS[ch]= rms;
-	      						if(p){printf("\tCH_%d_%2d FALL (Mean %4.0lf RMS %6.3lf Eff %.3lf)\n",ch/64,ch%64,mean,rms,eff);}
-	    					}
-					}// end of loop on channels
-				}	
-				lfile->Close(); 
-				delete lfile;
-				lscantree->Fill();
-			} // end of loop on runs
-  	    		lscanfile->cd();	
-			//lscantree->Print(); 				
-			lscantree->Write(); 
-			delete lscantree;
-      			lscanfile->Close();
-			delete lscanfile;
-
-			printf("Data from histos  ingested ");
-			printf("in %s\n",fTDCscanroot.c_str()); 
-      			break;
-		default: 
-      			printf("Warning: scan mode not setted \n");
-      		break;
+				default: 
+      	printf("Warning: scan mode not setted \n");
+      	break;
     	}
-    	break;
+    break;
+		case 2: // ADC
+		break;
   	default:
-    		printf("Warning: daq mode not setted \n");
-    	break;
+    printf("Warning: daq mode not setted \n");
+   	break;
   }
 }
 
-
-
-void TRich_Analysis::ProcessTDCscan(){
-
+void TRich_Analysis::TDC_Scan_Read(){
+	
+	bool printfilename = false;
 	bool print = false;
 
-  //printf("\n%s\n",__FUNCTION__);
+	int r; // run 
+
+	int rA = fTDC_runID_first;// first
+	int rB = fTDC_runID_last; // last
+
+	int ch; // channel 
+	int chA=0; // first channel 
+	int chB=191; // last channel
   
-  TCanvas* mycanv = new TCanvas("mycanv","",1280-2*SIZEOFCANV,0,2*SIZEOFCANV,SIZEOFCANV);
+	// init output file... fTDC_runID_last must be correctly setted 
+	char lnumstr[7]; // run ID
+ 	sprintf(lnumstr, "_%06d",  fTDC_runID_last);	
+	std::string outfile = SCANPATH   + frun_name  + lnumstr + "_scan" + ".root";
 
-	std::string nomescanpdf = 	fTDCscanpdf;
+	TRich_Calib * calib = new TRich_Calib(outfile.c_str());
 
-  // OPEN PDF FILE
-  mycanv->Print(Form("%s[",nomescanpdf.c_str()));
+	for(r=rA;r<=rB;r++){ // loop on runs
 
+		calib->Reset();
 
-	// local variables associated to the Ttree
-  UInt_t gain;
-	UInt_t thr;
-	UInt_t runID;
-	UInt_t totEvents;
-	
-	Float_t riseEdges[192];
-	Float_t riseMean[192];
-	Float_t riseRMS[192];
+		calib->RunID(r);
 
-	Float_t fallEdges[192];
-	Float_t fallMean[192];
-	Float_t fallRMS[192];
+		// set  file names for this run (suffix _histosingle.root and .log)
+		sprintf(lnumstr, "%06d",  r);
+		std::string infile   = HISTOPATH + frun_prefix + lnumstr + "_histosingle" + ".root";
+		std::string logbook  = "../../data/out/" + frun_prefix + lnumstr + ".log";
+		if(printfilename)printf("%5d Histograms: %s \n",r,infile.c_str());
+		//printf("%5d Logbook   : %s ",r,logbook.c_str());
 
+		// retrieve data from logbook
+		TRich_Config cfg;
+		cfg.ParseFile(logbook.c_str());
+  	cfg.Read();
 
-	// local histograms
+		calib->Threshold(cfg.Threshold());
+		calib->Gain(this->GetGain());	
+  	calib->NTrigger(cfg.GetLogNEvents());
 
-	Int_t nbinsx = 192;
-	Int_t nbinsy = 1024;
-	Int_t nbinsz = 255;
+		// retrieve single channel TDC spectra (Rise,Fall, Duration)
 
-	Double_t xlow = -0.5;
-	Double_t ylow = -0.5;
-	Double_t zlow = -0.5;
+		TFile * f = new TFile(infile.c_str(),"READ"); 
 
-	Double_t xup = 191.5;
-	Double_t yup = 1023.5;
-	Double_t zup = 254.5;
+		for(ch=chA;ch<=chB;ch++){
 
+			bool tris = true;
 
-	TH3F * h123 = new TH3F("hcal","hcal",nbinsx,xlow,xup,nbinsy,ylow,yup,nbinsz,zlow,zup);
-
-	
-  TFile * lfile = new TFile(fTDCscanroot.c_str(),"OLD");  //lfile->GetListOfKeys()->Print();
-  
- 	TTree * ltree = (TTree*)lfile->Get("TDCscandata"); // better using a macro in general header
-
-
-	ltree->SetBranchAddress("gain"			,	&gain);			
-	ltree->SetBranchAddress("threshold"	,	&thr);		
-	ltree->SetBranchAddress("runID"			,	&runID);		
-	ltree->SetBranchAddress("totEvents"	,	&totEvents);	
-	  
-  ltree->SetBranchAddress("nFall"			,	fallEdges);
-  ltree->SetBranchAddress("tFall"			,	fallMean);
-  ltree->SetBranchAddress("dtFall"		,	fallRMS);
-  ltree->SetBranchAddress("nRise"			,	riseEdges);
-  ltree->SetBranchAddress("tRise"			,	riseMean);
-  ltree->SetBranchAddress("dtRise"		,	riseRMS);
-  
-
-	Int_t nEntries = ltree->GetEntries();
-
-	for(Int_t r = 0;r<nEntries;r++){ // one entry one run
+			TH1F * hrise = NULL;
+			TH1F * hfall = NULL;
+			TH1F * hdura = NULL;
 		
-		// RESET reading variables
-		gain=0;
-		thr =0;
-		runID =0;
-		totEvents =0;
-
-		for(int i=0;i<192;i++){
-
-			riseEdges[i]=.0;
-			riseMean[i]=.0;
-			riseRMS[i]=.0;
-			fallEdges[i]=.0;
-			fallMean[i]=.0;
-			fallRMS[i]=.0;
-		}
-		
-
-		// Get Entry
-    		ltree->GetEntry(r);
-
-		// Fill
-
-//...
+			hrise = (TH1F*) f->Get(Form("ch%03d_rise",ch));  // 0 Rising Edges
+			hfall = (TH1F*) f->Get(Form("ch%03d_fall",ch));  // 1 Falling Edges
+			hdura = (TH1F*) f->Get(Form("ch%03d_dura",ch));  // 2 Time Over Threshold
 	
-		// Print
-		if(print){
-		//	printf("Bytes %d ",nbytes);
-			printf("Entry %4d ",r);
-			printf("RUNID %3d ",runID);
-			printf("NTRIG %6d ",totEvents);
-			printf("GAIN %3d ",gain);
-			printf("THR %4d ",thr);	
-			printf("\n");
+			if(hrise==NULL){if(print){printf("Histo Rising Channel %d missing...\n",ch);} tris = false ;}
+			if(hfall==NULL){if(print){printf("Histo Falling Channel %d missing...\n",ch);} tris = false;}
+			if(hdura==NULL){if(print){printf("Histo Duration Channel %d missing...\n",ch);} tris = false;}
 
-			for(int ch = 0;ch<192;ch++){
-				if(fallEdges[ch]&&riseEdges[ch]){
-					printf("\t");
-					printf("ASIC_%d_CH_%2d: ",ch/64,ch%64);
-					printf("FALL (");
-					printf("%3.3lf, ",1*fallEdges[ch]/(totEvents));
-					printf("%3.1lf, ",fallMean[ch]);
-					printf("%5.0lf) ",fallRMS[ch]*1000);
-					printf("RISE (");
-					printf("%3.3lf, ",1*riseEdges[ch]/(totEvents));
-					printf("%3.1lf, ",riseMean[ch]);
-					printf("%5.0lf) ",riseRMS[ch]*1000);
-					printf("\n");
-					
-				}
-			}
+			if(!tris) continue;
+
+			calib->Entries(0, hrise->GetEntries(),ch);
+			calib->Entries(1, hfall->GetEntries(),ch);		
+			calib->Entries(2, hdura->GetEntries(),ch);
+			
+			calib->Mean(0,hrise->GetMean(),ch);
+			calib->Mean(1,hfall->GetMean(),ch);
+			calib->Mean(2,hdura->GetMean(),ch);
+
+			calib->RMS(0,hrise->GetRMS(),ch);
+			calib->RMS(1,hfall->GetRMS(),ch);
+			calib->RMS(2,hdura->GetRMS(),ch);
+
 		}
-	} // end of loop on entries (i.e. runs)
+		if(print){calib->Print();}
+		f->Close();
+		delete f;
+		calib->Fill();
+	}
+	calib->Write();
+	delete calib;
+	printf("Scan data in %s\n",outfile.c_str());
+	return;
 
-	ltree->Draw("gain:thr");
-	mycanv->Print(nomescanpdf.c_str());
-
-	ltree->Draw("totEvents:thr","");
-	mycanv->Print(nomescanpdf.c_str());
+}
 
 
-	ltree->SetMarkerStyle(7); 
-	ltree->SetMarkerSize(.6);
+
+void TRich_Analysis::TDC_Scan_Histo()
+{
+
+	char lnumstr[7]; // run ID
+ 	sprintf(lnumstr, "_%06d",  fTDC_runID_last);	
+	std::string infile = SCANPATH   + frun_name  + lnumstr + "_scan" + ".root";
+	std::string outfile = HISTOPATH   + frun_name  + lnumstr + "_scanhisto" + ".root";
+
+//	printf("%s input  = %s\n",__FUNCTION__,infile.c_str());
+//	printf("%s output = %s\n",__FUNCTION__,outfile.c_str());
+
+//	printf("FIRST  RUN %d \n",fTDC_runID_first);	
+//	printf("LAST   RUN %d \n",fTDC_runID_last);
+
+	TFile * f = new TFile(outfile.c_str(),"RECREATE");
+
+	// Histograms declaration
+	// 192 TH1F for:
+	// 0 : Efficiency Rise 
+	// 1 : Efficiency Fall
+	// 2 : Efficiency Duration
+	// 3 : Delay Leading  (falling)
+	// 4 : Delay Trailing (rising)
+	// 5 : Jittter Leading  (falling)
+	// 6 : Jittter Trailing (rising)
+	// 7 : Duration (time over threshold)
+	// 8 : Duration RMS (time over threshold)
+	int nvar = 9;	
+
+	int ch;
+	int chA =0;
+	int chB = 191;
+
+	TH1F * hthr[192][nvar];
+
+	int thr;
+	int gain;
+	int ntrig;
+
+	TH1F * hNtrig;
+
+	double effFall;
+	double effRise;
+	double effDura;
+
+	double delayFall;
+	double jitterFall;
+	double delayRise;
+	double jitterRise;
+
+	double duration;
+	double durationRMS;
+
+	int nbinTHR = 300;
+	double lowTHR = 0-0.5;
+	double highTHR = 600-0.5;
 
 
-	std::string what = "fallRMS";
+	for(ch=chA;ch<=chB;ch++){
+			hthr[ch][0] = new TH1F(Form("ch%d_EffFall",ch),"",nbinTHR,lowTHR,highTHR);
+			hthr[ch][1] = new TH1F(Form("ch%d_EffRise",ch),"",nbinTHR,lowTHR,highTHR);
+			hthr[ch][2] = new TH1F(Form("ch%d_EffDura",ch),"",nbinTHR,lowTHR,highTHR);
+			hthr[ch][3] = new TH1F(Form("ch%d_DlyFall",ch),"",nbinTHR,lowTHR,highTHR);
+			hthr[ch][4] = new TH1F(Form("ch%d_DlyRise",ch),"",nbinTHR,lowTHR,highTHR);
+			hthr[ch][5] = new TH1F(Form("ch%d_ttsFall",ch),"",nbinTHR,lowTHR,highTHR);
+			hthr[ch][6] = new TH1F(Form("ch%d_ttsRise",ch),"",nbinTHR,lowTHR,highTHR);
+			hthr[ch][7] = new TH1F(Form("ch%d_MeanDur",ch),"",nbinTHR,lowTHR,highTHR);
+			hthr[ch][8] = new TH1F(Form("ch%d_RMSDura",ch),"",nbinTHR,lowTHR,highTHR);
+	}
+	
+	hNtrig= new TH1F("ntrig","",nbinTHR,lowTHR,highTHR);
+	
+	TH2F * h2 = new TH2F("h2_EffDura","",191,-0.5,190.5,nbinTHR,lowTHR,highTHR);
 
-	for(int ch=128;ch<192;ch++){
+	TRich_Calib c;
 
-		if(ch>=128||ch<=63){
-			//printf("Drawing ch %d\n",ch);
-			ltree->Draw(Form("%s[%d]:thr",what.c_str(),ch),Form("gain==%d&&%s[%d]<=2.0",64,what.c_str(),ch),"");
-			for(int g = 2;g<=4;g++){
-				ltree->SetMarkerColor(g);	
-				ltree->Draw(Form("%s[%d]:thr",what.c_str(),ch),Form("gain==%d&&%s[%d]<=2.0",g*64,what.c_str(),ch),"SAME");
-			}
-			mycanv->Print(nomescanpdf.c_str());
+	if(!c.OpenFile(infile.c_str())){printf("File %s not found\n",infile.c_str());return;} 
+	
+	int entries = c.GetTree();
+
+	printf("Found %d runs\n",entries);
+
+	for(int e=0;e<entries;e++)
+	{
+		c.GetEntry(e);
+		c.Print();
+		ntrig = c.NTrigger();
+
+		hNtrig->Fill(thr,ntrig);
+
+		thr = c.Threshold(-1,0);
+
+		if(ntrig==0) continue;
+		
+		for(ch=chA;ch<=chB;ch++){
+
+			gain = c.Gain(-1,ch); 
+			
+			effFall =  c.Entries(1,-1,ch)/ntrig;
+			effRise =  c.Entries(0,-1,ch)/ntrig;
+			effDura =  c.Entries(2,-1,ch)/ntrig;
+
+			//printf("eff[%3d]= %.3lf %.3lf %.3lf\n ",ch,effFall,effRise,effDura);
+
+			delayFall = c.Mean(1,-1,ch);
+			jitterFall = c.RMS(1,-1,ch);
+
+			delayRise = c.Mean(0,-1,ch);
+			jitterRise = c.RMS(0,-1,ch);
+
+			duration = c.Mean(2,-1,ch);
+			durationRMS = c.RMS(2,-1,ch);		
+
+
+			hthr[ch][0]->Fill(thr,effFall);
+			hthr[ch][1]->Fill(thr,effRise);
+			hthr[ch][2]->Fill(thr,effDura);
+			hthr[ch][3]->Fill(thr,delayFall);
+			hthr[ch][4]->Fill(thr,delayRise);
+			hthr[ch][5]->Fill(thr,jitterFall);
+			hthr[ch][6]->Fill(thr,jitterRise);
+			hthr[ch][7]->Fill(thr,duration);
+			hthr[ch][8]->Fill(thr,durationRMS);
+
+			h2->Fill(ch,thr,effDura);
+
 		}
 	}
 
-// CLOSE PDF FILE
-  mycanv->Print(Form("%s]",nomescanpdf.c_str()));
+	f->cd();
+	hNtrig->Write();
+	delete hNtrig;
+	for(int k = 0; k<nvar; k++){
+		for(ch=chA;ch<=chB;ch++){
+			hthr[ch][k]->Write();
+			delete hthr[ch][k];
+		}
+	}
 
-//printf("Scan plots available at %s (n)\n",fTDCscanpdf.c_str()); 
+	h2->Write();
+	delete h2;
 
-	delete h123;
+	f->Close();
+	delete f;
+	
+	printf("Scan Histograms in %s\n",outfile.c_str());
 
-lfile->Close();
 
-delete lfile;
+}	
+void TRich_Analysis::TDC_Scan_Plot1()
+{
+// Create a pdf with plots vs THR for different gain
+	char lnumstr[7]; // run ID
+ 	sprintf(lnumstr, "_%06d",  fTDC_runID_last);	
+	std::string infile = HISTOPATH   + frun_name  + lnumstr + "_scanhisto" + ".root";
+	std::string outfile = PDFPATH   + frun_name  + lnumstr + "_vsTHR" + ".pdf";
+
+	//printf("%s input  = %s\n",__FUNCTION__,infile.c_str());
+	//printf("%s output = %s\n",__FUNCTION__,outfile.c_str());
+	
+	const char * p = 	outfile.c_str();
+	const char * canvname = "c";
+	int rows = 3;
+	int columns = 3;
+	int padsize = 200;
+	int padmargin = 8.; //%	
+	int sizex = columns *padsize;
+	int sizey = rows * padsize;
+	TCanvas * c = new TCanvas(canvname,"",sizex,sizey);
+	c->Print(Form("%s[",p)); 
+	c->Divide(columns,rows);
+	const int NPAD = columns*rows;
+	TPad * pad[NPAD];
+	float padm = padmargin/100.; 	
+	for(int p=0;p<NPAD;p++){
+		pad[p]=(TPad*)(c->FindObject(Form("%s_%d",canvname,p+1)));	
+		pad[p]->cd();
+  	pad[p]->SetGrid(kTRUE);
+		pad[p]->SetLogx(kFALSE);
+		pad[p]->SetLogy(kFALSE);
+		pad[p]->SetMargin(padm,padm,padm,padm); // left, right, bottom, top
+	}
+	
+	TFile * f = new TFile(infile.c_str(),"READ");
+
+	TH1F * h[9]; 
+
+	int ch;
+	int chA = 0;
+	int chB = 191;
+
+	int max_eff = 4;
+	int tmax = 800;
+	int jmax = 10;
+
+	int color;
+	for(ch = chA; ch<=chB; ch++){
+
+		h[0] = (TH1F*) f->Get(Form("ch%d_EffFall",ch));
+		h[1] = (TH1F*) f->Get(Form("ch%d_EffRise",ch));
+		h[2] = (TH1F*) f->Get(Form("ch%d_EffDura",ch));
+	
+		h[3] = (TH1F*) f->Get(Form("ch%d_DlyFall",ch));
+		h[4] = (TH1F*) f->Get(Form("ch%d_DlyRise",ch));
+		h[5] = (TH1F*) f->Get(Form("ch%d_MeanDur",ch));
+	
+		h[6] = (TH1F*) f->Get(Form("ch%d_ttsFall",ch));
+		h[7] = (TH1F*) f->Get(Form("ch%d_ttsRise",ch));
+		h[8] = (TH1F*) f->Get(Form("ch%d_RMSDura",ch));
+	
+		h[0]->SetMaximum(max_eff);
+		h[1]->SetMaximum(max_eff);
+		h[2]->SetMaximum(max_eff);
+
+		h[3]->SetMaximum(tmax);
+		h[4]->SetMaximum(tmax);
+		h[5]->SetMaximum(tmax);
+
+		h[6]->SetMaximum(jmax);
+		h[7]->SetMaximum(jmax);
+		h[8]->SetMaximum(jmax);
+
+
+		for(int k = 0; k<9;k++){
+			pad[k]->cd();
+			if(h[k]){
+				switch(k%3){
+					case 0: color = kRed; break;//fall 
+					case 1: color = kBlue; break;// rise
+					case 2: color = kMagenta; break;// time over threshold
+				}
+				h[k]->SetLineColor(color);
+				h[k]->GetXaxis()->SetTitle("Threshold [DAC unit]");
+				h[k]->GetXaxis()->CenterTitle();
+				h[k]->Draw();
+			}
+		}
+		c->Print(Form("%s",p)); 
+	}
+	c->Print(Form("%s]",p)); 
+	delete c;
+	f->Close();
+	delete f;
+	printf("Single Channel TDC Scan Plots in %s\n",p);
 
 }
+void TRich_Analysis::TDC_Scan_Plot2()
+{
+// creates gauguin plot X = channel Y = threshold Z = efficincy Duration
+
+	char lnumstr[7]; // run ID
+ 	sprintf(lnumstr, "_%06d",  fTDC_runID_last);	
+	std::string infile = HISTOPATH   + frun_name  + lnumstr + "_scanhisto" + ".root";
+	std::string outfile = PDFPATH   + frun_name  + lnumstr + "_vsTHR_vsChannel" + ".pdf";
+	const char * canvname = "c";
+
+	int rows = 1;
+	int columns = 1;
+	int padsize = 200;
+	int padmargin = 15.; //%	
+	int sizex = columns *padsize;
+	int sizey = rows * padsize;
+	TCanvas * c = new TCanvas(canvname,"",sizex,sizey);
+	c->Divide(columns,rows);
+	const int NPAD = columns*rows;
+	TPad * pad[NPAD];
+	float padm = padmargin/100.; 	
+	for(int p=0;p<NPAD;p++){
+		pad[p]=(TPad*)(c->FindObject(Form("%s_%d",canvname,p+1)));	
+		pad[p]->cd();
+  	pad[p]->SetGrid(kFALSE);
+		pad[p]->SetLogx(kFALSE);
+		pad[p]->SetLogy(kFALSE);
+		pad[p]->SetMargin(padm,padm,padm,padm); // left, right, bottom, top
+	}
 	
+	TFile * f = new TFile(infile.c_str(),"READ");
+
+	TH2F * h2 = (TH2F*) f->Get("h2_EffDura");
+  
+  const Int_t NRGBs = 5;
+  const Int_t NCont = 512;
+  
+  Double_t stops[NRGBs] = { 0.00, 0.34, 0.61, 0.84, 1.00 };
+  Double_t red[NRGBs]   = { 0.00, 0.00, 0.87, 1.00, 0.51 };
+  Double_t green[NRGBs] = { 0.00, 0.81, 1.00, 0.20, 0.00 };
+  Double_t blue[NRGBs]  = { 0.51, 1.00, 0.12, 0.00, 0.00 };
+  TColor::CreateGradientColorTable(NRGBs, stops, red, green, blue, NCont);
+  gStyle->SetNumberContours(NCont);
+
+
+	double minEff = 0.0;
+	double maxEff = 1.5;
+
+	if(h2){
+ 		gStyle->SetOptStat(0);
+		pad[0]->cd();
+ 		h2->SetMinimum(minEff);
+ 		h2->SetMaximum(maxEff);
+  	h2->GetXaxis()->SetTitle("Channel ID");	h2->GetXaxis()->CenterTitle();
+  	//h2->GetXaxis()->SetTitle("ANODE ID");	h2->GetXaxis()->CenterTitle();
+ 		h2->GetYaxis()->SetTitle("Threshold [DAC unit]");	h2->GetYaxis()->CenterTitle();	
+		h2->GetZaxis()->SetTitle("Hit Efficiency [# hit / # trigger ]");	h2->GetZaxis()->CenterTitle();	
+ 		h2->GetYaxis()->SetTitleOffset(1.5);
+		h2->GetXaxis()->SetTitleOffset(1.5);
+		h2->GetZaxis()->SetTitleOffset(1.5);
+		h2->Draw("COLZ");
+		c->Print(outfile.c_str()); 
+	}	
+	
+	delete c;
+	f->Close();
+	delete f;
+	printf("Gauguin TDC Scan Plots in %s\n",outfile.c_str());
+}
+
+
+
+void TRich_Analysis::TDC_Scan_Plot3()
+{
+// creates calibration plots X = threshols, y = gain, z = efficiency/jitter		
+
+
+	char lnumstr[7]; // run ID
+ 	sprintf(lnumstr, "_%06d",  fTDC_runID_last);	
+	std::string infile = HISTOPATH   + frun_name  + lnumstr + "_scanhisto" + ".root";
+	std::string outfile = PDFPATH   + frun_name  + lnumstr + "_vsTHR_vsGain" + ".pdf";
+
+	printf("%s input  = %s\n",__FUNCTION__,infile.c_str());
+	printf("%s output = %s\n",__FUNCTION__,outfile.c_str());
+
+}	
+
+
 
 int	TRich_Analysis::NameRun(const char * fileraw,int runID_last,bool enablePrint){
   
@@ -881,7 +1023,7 @@ int	TRich_Analysis::TDC_Read(){
 
       	// new header found, the previous event is concluded lets finalize the new entry and fill the tree
 				evt->EdgeList();				
-				//evt->Print(0);//evt->Print(2,34);// 0 nothing, 1 general info, 2, channel info use second argument to select channel, use 192 for all the channels			
+				evt->Print(2,33);//evt->Print(2,34);// 0 nothing, 1 general info, 2, channel info use second argument to select channel, use 192 for all the channels			
 				evt->Fill();
       	//evt->Reset(); // mandatory, it is done at the end of evt->Fill() 
 
@@ -1009,280 +1151,21 @@ void TRich_Analysis::TDC_Draw(TH1F * hRise,TH1F * hFall){
     tpsFall->SetY2NDC(Y1);
     
     // Drawing 
+		/*
     TCanvas * lmycanv = (TCanvas*)gROOT->GetListOfCanvases()->FindObject("mycanv");
     if(!lmycanv){printf("Canvas not found...\n");}
     
     lmycanv->cd(1)->SetLogy(1);
     lmycanv->cd(1)->SetGrid(1);
-    
+    */
     hRise->Draw();
     hFall->Draw("same");
     tpsRise->Draw("same");
     tpsFall->Draw("same");
-    lmycanv->Print(fTDCpdf.c_str());
+    //lmycanv->Print(fTDCpdf.c_str());
   }
 }
 
-
-
-
-void TRich_Analysis::ProcessTDC(){
-
-
-
-
-/*
-	printf("%s... file %s\n",__FUNCTION__,fioTDCroot.c_str());
-	bool printEvents 	= false;
-	bool printEdges 	= false;
-	bool hitreconstruction	= true;
-
-
-  	// RETRIEVE CONFIGURATION PARAMETERS
-  	//UInt_t thr 	= this->GetThreshold();	// get threshold from logbook (individual chip)
-  	//UInt_t gain 	= this->GetGain();	// get gain from logbook (individual channel)
-
- 	//UInt_t ltrigdly	= this->GetTriggerDelay();
- 	//UInt_t llookback	= this->GetEventBuilderLookBack();
- 	UInt_t lwindow	= this->GetEventBuilderWindow();
- 	lwindow = 8*lwindow; // in ns
-  
-  	
-    //	printf("Settings MAROC3:\n");
-    
-   // 	printf("Threshold [DAC0 unit] = %d\n",thr);
-    //	printf("GAIN %4d ",gain);
-    
-   // 	printf("Settings FPGA:\n");
-    //	printf("Trigger delay           =%5d -> %d*[8ns] = %5d [ns]\n",ltrigdly,ltrigdly,ltrigdly*8);  //128*8ns = 1024ns trigger delay
-    //	printf("Event Builder LookBack  =%5d -> %d*[8ns] = %5d [ns]\n",llookback,llookback,llookback*8);
-    //	printf("Event Builder Window	=%5d -> %d*[8ns] = %5d [ns]\n",lwindow,lwindow,lwindow*8);	
-  	
-  
-  	TFile * lfile = new TFile(fioTDCroot.c_str(),"UPDATE"); if(lfile->IsZombie()){printf("pFile is Zombie!\n");}
-  	TTree * ltree = (TTree*)lfile->Get("TDCdata"); // better using a macro in general header
-  
-  	UInt_t lEventID	= 0; ltree->SetBranchAddress("triggerID",&lEventID);
-  	UInt_t ltstamp0 = 0; ltree->SetBranchAddress("tstamp0",&ltstamp0);
-  	UInt_t ltstamp1 = 0; ltree->SetBranchAddress("tstamp1",&ltstamp1);
-  	UInt_t lnedge =   0;ltree->SetBranchAddress("nedge"	,&lnedge);
-  
-  	double time_prev = 0.0;
-  	double time = 0.0;
-  	double dt;
-  
-  	int maxHz = 1000*1000; // 1 MHz
- 	// int maxEdges = 3*4*64; // max 4 edges/channel per trigger (at the baseline is Billions but they will go in overflow bin)
- 	int maxEdges = 250; // max 4 edges/channel per trigger (at the baseline is Billions but they will go in overflow bin)
-    
-
-  	int totEvts = ltree->GetEntries();
-  
-  	TH1F * hTRGtime = new TH1F("TRGtime","",totEvts,-0.5,totEvts-0.5);
-  	TH1F * hTRGfreq  = new TH1F("TRGfreq","",maxHz,-0.5,maxHz-0.5);	// 1 Hz Resolution
-  
-	TH1F * hEdges = new TH1F("hEdges","",totEvts,-0.5,totEvts-0.5);
-  	TH1F * hEdgesD = new TH1F("hEdgesD","",maxEdges,-0.5,maxEdges-0.5);
-
-  
-  	int timmax = lwindow;
-  	int timmin = 0;
-	
-  	TH1F * hTRise = new TH1F("hTRise","",timmax-timmin,timmin-0.5,timmax-0.5);
-  	TH1F * hTFall = new TH1F("hTFall","",timmax-timmin,timmin-0.5,timmax-0.5);
-
-  	hTRise->SetTitle("All channels - Edge Time Distribution");
-  	hTFall->SetTitle("All channels - Edge Time Distribution");
-	
-  	//TH2F * hTFallvsTot = new TH2F("hTFallvsTot","",timmax-timmin,timmin-0.5,timmax-0.5,timmax-timmin,timmin-0.5,timmax-0.5);
-  	//TH2F * hTRisevsTot = new TH2F("hTRisevsTot","",timmax-timmin,timmin-0.5,timmax-0.5,timmax-timmin,timmin-0.5,timmax-0.5);
-
- 	TH1F * hTRiseCh[192]; 
-  	TH1F * hTFallCh[192];
-  	TH1F * hTotCh[192];
-
-
-	for (int i=0; i<192; i++) {
- 		//nt ltmin = 200;
-		//int ltmax = 400;
-		
-	//	timmin = ltmin;
-	//	timmax = ltmax;
-    		
-hTRiseCh[i] = new TH1F(Form("ch%03dTRise",i),"",timmax-timmin,timmin-0.5,timmax-0.5);
-    		hTFallCh[i] = new TH1F(Form("ch%03dTFall",i),"",timmax-timmin,timmin-0.5,timmax-0.5);
-    		hTotCh[i] = new TH1F(Form("ch%03dTTot",i),"",400,-200.5,199.5); 
-  	}
-  
-  	const int maxhit = 10000;  // a small value could create segmentation fault when analising runs with threshold  very close to pedestal
- 
-  	UInt_t ltime[maxhit];
-  	UInt_t lpolarity[maxhit];
-  	UInt_t lchannel[maxhit];
-  
-  	ltree->SetBranchAddress("polarity"	,lpolarity);
-  	ltree->SetBranchAddress("channel"	,lchannel);
-  	ltree->SetBranchAddress("time"	,ltime);
-  
-
-  	int polar;
-  	int channel;
-  	int hittime;
-  	int polar2;
-  	int channel2;
-  	int hittime2;
-	int duration; // time over threshold (tot)
-	
-	// controlla chi e' piu grande tra totevents e max event e inizializza il ciclo for
-  
-	int maxevent= totEvts;
-	int tothit=0;
-
-  	// LOOP ON EVENTS
-  	for(int e = 0;e<maxevent;e++){
-    		lEventID = 0;
-    		ltstamp0 = 0;
-    		ltstamp1 = 0;
-   		lnedge = 0;
-    
-   		ltree->GetEntry(e);
-    
-    		time = this->DecodeTimeStamp(ltstamp0,ltstamp1);
-    		dt = time-time_prev;
-    		time_prev = time;
-    
-
-    		if (printEvents) {
-      			if(e!=totEvts-1){
-				if(e%32==0){
-					printf("EVENT LIST:\n");
-				}  
-				printf("ID %4d ",lEventID);   
-				printf("NEdges %3d ",lnedge);   
-				printf("Time %12.10lf [s] ",time);
-				printf("(DT %12.10lf [s],  ",dt);
-      				printf("Freq %6.0lf [Hz])", 1/dt);
-				printf("\n");
-      			}
-    		}
-		hTRGtime->Fill(lEventID,time);
-  	
-		if(e>1&&e!=totEvts-1){
-		// need 2 event to measure dt! first event is skipped,
-		// last event is not filled by TDC_Read so it would give a negative dt
-			hTRGfreq->Fill(1/dt);
-		} 
-    		hEdges->Fill(lEventID,lnedge);
-    		hEdgesD->Fill(lnedge); 
-   
-
-    		// LOOP ON EDGES
-    		for (int i=0; i<(int)lnedge; i++) {
-      
-			// Read
-      			polar = lpolarity[i];
-      			channel = lchannel[i];
-      			hittime = ltime[i];
-     
-			// Fill
-      			switch (polar) {
-      			case 0:
-				hTRise->Fill(hittime);
-				hTRiseCh[channel]->Fill(hittime);
-				break;
-      			case 1:
-				hTFall->Fill(hittime);
-				hTFallCh[channel]->Fill(hittime);
-				break;
-      			default: printf("Error in %s: unknown edge polarity %d\n",__FUNCTION__,polar);
-				break;
-      			}
-			
-
-			if(hitreconstruction){			// Hit Reconstruction
-				duration =0;
-				// look for the same channel with opposite polarity and calculate hit duration
- 				for (int j=i+1; j<(int)lnedge; j++) {
-					channel2 = lchannel[j];
-					if(channel2==channel){
-						polar2 = lpolarity[j];
-						if(polar2!=polar){
-							hittime2 = ltime[j];	
-							if(polar2==1){
-								duration = hittime-hittime2;
-							}else{
-								duration = hittime2-hittime;
-							}							
-							tothit++;				
-						
-							hTotCh[channel]->Fill(duration);
-	
-
-									
-						}
-					}
-				}
-			}		
-      			if(printEdges){
-				if(i==0){
-	  				printf("EDEGE LIST\t( Rise  = <  Fall = > )\n");
-				}
-				printf("%3d ",i+1);			
-				printf("CH_%d",channel/64);
-				printf("_%2d ",channel%64);
-		
-				switch(polar){
-					case 0: printf("< "); break;
-					case 1: printf("> ");break;
-					default:break;
-				}
-				printf("%4d  ",hittime);
-				printf("\n");	
-  	    		}	// end of if printf
-  	  	} // end of loop on edgess
-  	} // end of loop on events
-  
-
-  	printf("HITS = %d\n",tothit);
-
-  	hTRGtime->Write();  
-  	hTRGfreq->Write();
-  	hEdges->Write();
-  	hEdgesD->Write();
-  	hTRise->Write();
-  	hTFall->Write();
-//hTRisevsTot->Write();
-//hTFallvsTot->Write();
-
-
-  	delete hTRGtime;
-  	delete hTRGfreq;
-  	delete hEdges;
-  	delete hEdgesD;
-  	delete hTFall;
-  	delete hTRise;
-//	delete hTFallvsTot;
-//	delete hTRisevsTot;
-  
-	int histc = 0;
-  	for (int i = 0; i<192; i++){
-		histc++;
-      		hTRiseCh[i]->Write();
-      		hTFallCh[i]->Write();
-      		hTotCh[i]->Write();
-			
-      		if(hTRiseCh[i]){delete hTRiseCh[i];}
-      		if(hTFallCh[i]){delete hTFallCh[i];}
-      		if(hTotCh[i]){delete hTotCh[i];}
-  	}
-  	
-	lfile->Close();	
-  	delete lfile;	
-	//printf("Analysis completed successfully\n");
-	printf("Histograms added %d to   %s \n",histc,fioTDCroot.c_str());
-
-*/
-}
 void TRich_Analysis::Plot(){
 
 	std::string infile  = HISTOPATH + frun_name + "_histo" + ".root";
@@ -1340,11 +1223,14 @@ void TRich_Analysis::Plot(){
 
 void 	TRich_Analysis::TDC_Spectra(){
 
+
+	
 	std::string outfile  = HISTOPATH + frun_name + "_histo" + ".root";
 
 	unsigned int event, nedge, channel, polarity, time,nedge_max=0;
 	double etime, dt, etime_prev=0.0;
-	bool dbg,ok;
+	bool dbg= false;
+	bool ok;
 	int entries;
   unsigned int lwindow	= this->GetEventBuilderWindow(); // clock ticks [8ns]
   int timmax = 8*lwindow; // ns
@@ -1364,7 +1250,7 @@ void 	TRich_Analysis::TDC_Spectra(){
   TH1F * fall 		= new TH1F(HBRDFALL,"",timmax-timmin,timmin-0.5	, timmax-0.5);
 
 	for(int e=0; e<entries; e++){
-		dbg = (e%(entries/10)==0) ? true : false;
+		//dbg = (e%(entries/10)==0) ? true : false;
 		tdc->Reset();
 		tdc->GetEntry(e);// event ID (header data) + edge list
 		event = tdc->TrigNum();
@@ -1405,7 +1291,7 @@ void 	TRich_Analysis::TDC_Spectra(){
   int nbin = nedge_max*2.0;
   TH1F * edgeD = new TH1F(H_NEDGES,"",nbin,-0.5,nbin-0.5);
 	for(int e=0; e<entries; e++){
-		dbg = (e%(entries/10)==0) ? true : false;
+	//	dbg = (e%(entries/10)==0) ? true : false;
 		tdc->Reset();
 		tdc->GetEntry(e);		
 		nedge = tdc->NEdges();	
@@ -1423,19 +1309,19 @@ void 	TRich_Analysis::TDC_Spectra(){
 
 void 	TRich_Analysis::TDC_SpectraSingleChannel(){
 
-// to do correlazione time of the edge vs duration
 
 	std::string outfile  = HISTOPATH + frun_name + "_histosingle" + ".root";
 
 	unsigned int nedge, channel, polarity, time,channel2, polarity2, time2;
-	bool dbg,ok;
+	//bool dbg;
+	bool ok;
 	int entries,duration;
   unsigned int lwindow	= this->GetEventBuilderWindow(); // clock ticks [8ns]
   int t2 = 8*lwindow; // ns
   int t1 = 0;
   
-  int d1 = -100;
-  int d2 = 100;
+  int d1 = -200;
+  int d2 = 200;
   //int polar_discri = this->GetPolarDiscri();
   //printf("Polar Discri = %u\n",polar_discri);// =1 LEADING EDGE is the falling
 
@@ -1450,15 +1336,17 @@ void 	TRich_Analysis::TDC_SpectraSingleChannel(){
  	TH1F * rise[nchannels];	
   TH1F * fall[nchannels];
   TH1F * dura[nchannels];
+	TH2F * walk[nchannels];
 
 	for (int i=0; i<nchannels; i++) {
 		rise[i] = new TH1F(Form("ch%03d_rise",i),"",t2-t1,t1-0.5,t2-0.5);
     fall[i] = new TH1F(Form("ch%03d_fall",i),"",t2-t1,t1-0.5,t2-0.5);
     dura[i] = new TH1F(Form("ch%03d_dura",i),"",d2-d1,d1-0.5,d2-0.5);
+		walk[i] = new TH2F(Form("ch%03d_walk",i),"",d2-d1,d1-0.5,d2-0.5,t2-t1,t1-0.5,t2-0.5);
   }
   
 	for(int e=0; e<entries; e++){
-		dbg = (e%(entries/10)==0) ? true : false;
+		//dbg = (e%(entries/10)==0) ? true : false;
 		tdc->Reset();
 		tdc->GetEntry(e);// event ID (header data) + edge list
 		nedge = tdc->NEdges();	
@@ -1480,8 +1368,10 @@ void 	TRich_Analysis::TDC_SpectraSingleChannel(){
       		polarity2= tdc->Polarity(j);
       		if(polarity2!=polarity){
       			time2 = tdc->Time(j);
-      			duration = time2-time;//to b improved,add checks t1>t2, polar discri
+      			duration = time2-time;//to b improved,add checks t1>t2, and use polar discri
 						dura[channel]->Fill(duration);
+						walk[channel]->Fill(duration,time);
+			//		printf("duraiton x %d, y time %u \n",duration , time);
       		}
       	}
       }
@@ -1492,9 +1382,11 @@ void 	TRich_Analysis::TDC_SpectraSingleChannel(){
 		rise[i]->Write();
 		fall[i]->Write();
 		dura[i]->Write();
+		walk[i]->Write();
 		delete rise[i];
 		delete fall[i];
 		delete dura[i];	
+		delete walk[i];	
   }
   
   out_file->Close();
@@ -1504,30 +1396,121 @@ void 	TRich_Analysis::TDC_SpectraSingleChannel(){
 }
 
 
-void TRich_Analysis::TDC_GetSingleChannel(){
-
-// Get Efficiency, Mean and RMS
-
-	std::string infile  = HISTOPATH + frun_name + "_histosingle" + ".root";
-	//std::string outfile = PDFPATH   + frun_name + "_single" + ".txt";
-	//const char * p =  outfile.c_str();
+void 	 TRich_Analysis::TDC_Export(){
 	
+	this->TDC_GetSingleChannel(0);
+}
+
+void 	 TRich_Analysis::TDC_Uniformity(){
+
+	this->TDC_GetSingleChannel(1);
+
+}
+void 	 TRich_Analysis::TDC_Image(){
+
+	this->TDC_GetSingleChannel(2);
+
+}
+
+
+void TRich_Analysis::TDC_GetSingleChannel(int opt){
+
+
+					gStyle->SetOptStat(0);	
+	std::string infile  = HISTOPATH + frun_name + "_histosingle" + ".root";
+	
+	std::string outfile;
+	FILE * txt;
+	int nhisto = 9;
+	TH1F * hch[nhisto]; // Uniformity histos 
+	TH2F * hpx[nhisto]; // 2D representation Pixels
+
+	// 0 - Rise entries vs channel
+	// 1 - Fall entries vs channel
+	// 2 - Rise delay vs channel
+	// 3 - Fall delay vs channel
+	// 4 - Rise tts vs channel
+	// 5 - Fall tts vs channel	
+	// 6 - Duration Entries vs channel 
+	// 7 - Duration Mean vs channel
+	// 8 - Duration RMS vs channel
+	
+TCanvas * mycanv;
+
+
+	TRich_Adapter adapter;
+	
+
+	int pixel;
+	int pixel_offset;
+
+//	bool pixel_enable = true; // anodic view instead of electromnic channel
+//	bool geo_enable = true; // mapmt view 2 D
+
+	int Xpix_offset;
+	int Ypix;
+	int Xpix;
+
+
+	switch(opt){
+		case TEXT:  
+			outfile = TXTPATH + frun_name + "_statistics" + ".txt";
+			txt = fopen(outfile.c_str(),"w");
+			break;
+
+		case UNIF: 
+			outfile = PDFPATH + frun_name + "_uniformity" + ".pdf";
+			mycanv = new TCanvas("mycanv");
+			mycanv->Print(Form("%s[",outfile.c_str()));
+			mycanv->cd(1)->SetLogy(0);
+  		mycanv->cd(1)->SetLogx(0);
+ 			mycanv->cd(1)->SetGrid(1);
+			for (int i=0; i<nhisto; i++) hch[i] = new TH1F("","",192,0-.5,192-.5);
+			break;
+		
+		case PIXEL: 
+			outfile = PDFPATH + frun_name + "_image" + ".pdf";
+			mycanv = new TCanvas("mycanv");
+			mycanv->Print(Form("%s[",outfile.c_str()));
+			mycanv->cd(1)->SetLogy(0);
+  		mycanv->cd(1)->SetLogx(0);
+ 			mycanv->cd(1)->SetGrid(1);
+			for (int i=0; i<nhisto; i++) hpx[i] = new TH2F("","",30,0,30,8,0,8);
+
+			break;
+		default: printf("Error in %s: Unknown option",__FUNCTION__);break;
+	} 
+
+	// READ settings from logbook
+	TRich_Config cfg;
+	cfg.ParseFile(finlog.c_str());
+  cfg.Read();
+	int thr = cfg.Threshold();
+	int gain = this->GetGain();
+	int totEv = cfg.GetLogNEvents();
+	//printf("THR %d GAIN %d NEvents %d Option %d\n",thr,gain ,totEv,opt);
+
+
+	// Get Single channel histograms from .root file
 	TFile f(infile.c_str(),"READ"); 
 	
 	TH1F * hrise = NULL;
 	TH1F * hfall = NULL;
+	TH1F * hdura = NULL;
 	
 	int nchannels = 192;
 		
-	const int k = 3; // 0 = rise, 1 =  fall, 2 = duration
+	const int k = 3; 
 	double counts[k]; 
 	double mean[k];
 	double rms[k];		
 		
+	// Loop on channels and extract number of hit (entries), average delay (TDC mean), jitter (TDC rms)	
 	for(int i =0; i<nchannels; i++){
 		
 		hrise = (TH1F*) f.Get(Form("ch%03d_rise",i)); 
 		hfall = (TH1F*) f.Get(Form("ch%03d_fall",i)); 
+		hdura = (TH1F*) f.Get(Form("ch%03d_dura",i)); 
 
 		if(hfall!=NULL&&hrise!=NULL){
 
@@ -1538,18 +1521,185 @@ void TRich_Analysis::TDC_GetSingleChannel(){
 			counts[1] = hrise->GetEntries();
 			mean[1] = hrise->GetMean();
 			rms[1] = hrise->GetRMS();
-			
-			/*
-			if(counts[0]){
-				printf("CH%3d",i);
-				printf("ENTRIES %.3lf MEAN %.3lf RMS %.3lf ",counts[0],mean[0],rms[0]);
-				printf("EFF %.3lf MEAN %.3lf RMS %.3lf",counts[1],mean[1],rms[1]);
-				printf("\n");	
-			}
-			*/
+
+			counts[2] = hdura->GetEntries();
+			mean[2] = hdura->GetMean();
+			rms[2] = hdura->GetRMS();
+
+			switch(opt){
+				case TEXT: 
+
+						fprintf(txt,"CH %3d ",i);
+						fprintf(txt,"Entries: %.0lf %.0lf %.0lf ",counts[0],counts[1],counts[2]);
+						fprintf(txt,"Mean : %.3lf %.3lf %.3lf ",mean[0],mean[1],mean[2]);				
+						fprintf(txt,"RMS : %.3lf %.3lf %.3lf ",rms[0],rms[1],rms[2]);
+						fprintf(txt,"\n");
+
+						fprintf(stderr,"CH %3d ",i);
+						fprintf(stderr,"Entries: %.0lf %.0lf %.0lf ",counts[0],counts[1],counts[2]);
+						fprintf(stderr,"Mean : %.3lf %.3lf %.3lf ",mean[0],mean[1],mean[2]);				
+						fprintf(stderr,"RMS : %.3lf %.3lf %.3lf ",rms[0],rms[1],rms[2]);
+						fprintf(stderr,"\n");
+						/*
+						printf("CH %3d ",i);
+						printf("N %.0lf MEAN %.3lf RMS %.3lf ",counts[0],mean[0],rms[0]);
+						printf("N %.0lf MEAN %.3lf RMS %.3lf ",counts[1],mean[1],rms[1]);				
+						printf("N %.0lf MEAN %.3lf RMS %.3lf ",counts[2],mean[2],rms[2]);
+						printf("\n");	
+					
+						*/
+
+				
+					break;
+				case UNIF: 
+						hch[0]->Fill(i,counts[1]);		
+						hch[1]->Fill(i,counts[0]);
+						hch[2]->Fill(i,mean[1]);
+						hch[3]->Fill(i,mean[0]);			
+						hch[4]->Fill(i,rms[1]);
+						hch[5]->Fill(i,rms[0]);
+						hch[6]->Fill(i,counts[2]);
+						hch[7]->Fill(i,mean[2]);
+						hch[8]->Fill(i,rms[2]);
+				
+					break;
+				case PIXEL: 
+					pixel = adapter.GetAnode(i%64);
+					pixel_offset = (i/64)*64;
+				//	printf("channel %d -> anode %d ",i,pixel);
+				//	printf("asic %d ->offset %d \n",i/64,pixel_offset)	;
+
+					Xpix_offset = i/64*8;
+					Ypix =(pixel-1)/8;
+					Xpix = (pixel-1)%8;
+
+				//	printf("channel %3d pixel %2d Y %d X %d (%2d mapmt %d)\n",i,pixel,Ypix,Xpix,Xpix+Xpix_offset,i/64);
+		
+					hpx[0]->Fill(Xpix+Xpix_offset,Ypix,counts[1]/totEv);		
+					hpx[1]->Fill(Xpix+Xpix_offset,Ypix,counts[0]/totEv);
+					hpx[2]->Fill(Xpix+Xpix_offset,Ypix,mean[1]);
+					hpx[3]->Fill(Xpix+Xpix_offset,Ypix,mean[0]);			
+					hpx[4]->Fill(Xpix+Xpix_offset,Ypix,rms[1]);
+					hpx[5]->Fill(Xpix+Xpix_offset,Ypix,rms[0]);
+					hpx[6]->Fill(Xpix+Xpix_offset,Ypix,counts[1]/totEv);
+					hpx[7]->Fill(Xpix+Xpix_offset,Ypix,mean[2]);
+					hpx[8]->Fill(Xpix+Xpix_offset,Ypix,rms[2]);
+
+
+
+					break;
+				default: printf("Error in %s: Unknown option",__FUNCTION__);break;
+			}			
 		}
 	}
 	f.Close();	
+
+// Finalize
+	switch(opt){
+				case TEXT: 
+					fclose(txt);
+					printf("Single Channel Statistics in %s\n",outfile.c_str());
+					break;
+
+				case UNIF: 
+					for (int i=0; i<nhisto; i++) {
+					//	hch[i]->SetStats(0);
+						if(i%2==1&&i<6)hch[i]->SetLineColor(kRed);
+						if(i>=6)hch[i]->SetLineColor(kMagenta);
+						hch[i]->GetXaxis()->SetTitle("Channel [0..191]"); // electronics view
+				//		hch[i]->GetXaxis()->SetTitle("Pixel [0..63][0..63][0..63]"); // anodic view
+					}			
+
+					// Efficiency
+ 					//hch[0]->SetMaximum(2.);
+ 					//hch[0]->SetMinimum();
+					hch[0]->Scale(1./totEv);
+					hch[1]->Scale(1./totEv);
+					hch[0]->GetYaxis()->SetTitle("N Edges /Tot Events");
+  				hch[0]->SetTitle("Efficiency");
+					hch[0]->Draw();
+					hch[1]->Draw("SAME");
+					mycanv->Print(Form("%s",outfile.c_str()));
+					
+					// Mean Delay
+					//	hch[2]->SetMaximum(timmax-timmin);
+					hch[2]->GetYaxis()->SetTitle("Edge Time Average  [ns]");
+  				hch[2]->SetTitle("Time Delay");
+					hch[2]->Draw();
+					hch[3]->Draw("SAME");
+					mycanv->Print(Form("%s",outfile.c_str()));
+	
+					// Jitter
+					//	hch[4]->SetMaximum(5);
+					hch[4]->GetYaxis()->SetTitle("Edge Time RMS [ns]");
+  				hch[4]->SetTitle("Time Resolution");
+					hch[4]->Draw();
+					hch[5]->Draw("SAME");
+					mycanv->Print(Form("%s",outfile.c_str()));
+  	
+
+					// Efficiency Duration
+				// 	hch[6]->SetMaximum(2.0);
+					hch[6]->Scale(1./totEv);
+					hch[6]->GetYaxis()->SetTitle("N Durations /Tot Events");
+				  hch[6]->SetTitle("Hit Efficiency");
+					hch[6]->Draw();
+					mycanv->Print(Form("%s",outfile.c_str()));
+	
+					// Mean Duration
+					//	hch[7]->SetMaximum(timmax-timmin);
+					hch[7]->GetYaxis()->SetTitle("Mean Duration [ns]");
+  				hch[7]->SetTitle("Time over Threshold ");
+					hch[7]->Draw();
+					mycanv->Print(Form("%s",outfile.c_str()));
+	
+					// Duration rms
+					//hch[8]->SetMaximum(5);
+					hch[8]->GetYaxis()->SetTitle("RMS Duration[ns]");
+  				hch[8]->SetTitle("Time over Threshold RMS");
+					hch[8]->Draw();
+					mycanv->Print(Form("%s",outfile.c_str()));
+
+					mycanv->Print(Form("%s]",outfile.c_str()));
+					for (int i=0; i<nhisto; i++) if(hch[i])delete hch[i];
+					delete mycanv;
+					printf("Uniformity Plots in %s\n",outfile.c_str());
+					break;
+
+				case PIXEL: 
+					hpx[0]->SetTitle("Efficiency Rise");
+					hpx[1]->SetTitle("Efficiency Fall");
+					hpx[2]->SetTitle("Rise Time");
+					hpx[3]->SetTitle("Fall Time");
+					hpx[4]->SetTitle("Jitter Rise");
+					hpx[5]->SetTitle("Jitter Fall");
+					hpx[6]->SetTitle("Efficiency Time Over Threshold");
+					hpx[7]->SetTitle("Time Over THreshold (Charge)");
+					hpx[8]->SetTitle("Tot REsolution (Charge RMS)");
+
+					hpx[0]->SetMaximum(2.);
+					hpx[1]->SetMaximum(2.);
+					hpx[6]->SetMaximum(2.);
+
+/* TO BE IMPROVED, time windowing is is correlated with calibration and daq rate...	
+				hpx[2]->SetMaximum(350);
+					hpx[2]->SetMinimum(150);
+					hpx[3]->SetMaximum(350);
+					hpx[3]->SetMinimum(150);
+	*/					
+					gStyle->SetOptStat(0);	 
+					for (int i=0; i<nhisto; i++) {
+						hpx[i]->Draw("COLZ");
+						mycanv->Print(Form("%s",outfile.c_str()));
+					}
+					mycanv->Print(Form("%s]",outfile.c_str()));
+					for (int i=0; i<nhisto; i++) if(hch[i])delete hpx[i];
+					delete mycanv;
+					printf("MAPMT images in %s\n",outfile.c_str());
+					break;
+				default: printf("Error in %s: Unknown option",__FUNCTION__);break;
+	}
+
 }
 
 void TRich_Analysis::TDC_PlotSingleChannel(){
@@ -1559,7 +1709,7 @@ void TRich_Analysis::TDC_PlotSingleChannel(){
 	const char * p =  outfile.c_str();
 	const char * canvname = "c";
 	int rows = 1;
-	int columns = 2;
+	int columns = 3;
 	int padsize = 200;
 	int padmargin = 10.; //%	
 	int sizex = columns *padsize;
@@ -1584,16 +1734,21 @@ void TRich_Analysis::TDC_PlotSingleChannel(){
 	TH1F * hrise = NULL;
 	TH1F * hfall = NULL;
 	TH1F * hdura = NULL;
+	TH2F * hwalk = NULL;
 	
 	int nchannels = 192;
-	double max = 10000*2.;
-	double min = 1.;
+	double max = 10.0E6;
+	double min = 0.1;
 	
 	for(int i =0; i<nchannels; i++){
 		
 		hrise = (TH1F*) f.Get(Form("ch%03d_rise",i)); 
 		hfall = (TH1F*) f.Get(Form("ch%03d_fall",i)); 
 		pad[0]->cd()->SetLogy(1);		
+
+
+		this->TDC_Draw(hrise,hfall);
+/*
 		if(hfall!=NULL&&hrise!=NULL){
 			hfall->SetLineColor(kRed);
 			hrise->SetLineColor(kBlue);		
@@ -1602,7 +1757,7 @@ void TRich_Analysis::TDC_PlotSingleChannel(){
 			hfall->Draw();
 			hrise->Draw("SAME");
 		}
-		
+	*/	
 		hdura = (TH1F*) f.Get(Form("ch%03d_dura",i)); 
 		pad[1]->cd()->SetLogy(1);	
 		if(hdura!=NULL){
@@ -1611,6 +1766,17 @@ void TRich_Analysis::TDC_PlotSingleChannel(){
 			hdura->SetLineColor(kMagenta);		
 			hdura->Draw();
 		}
+
+		hwalk = (TH2F*) f.Get(Form("ch%03d_walk",i)); 
+		pad[2]->cd()->SetLogy(0);	
+		if(hwalk!=NULL){
+//			hwalk->SetMaximum(max);
+	//		hwalk->SetMinimum(min);
+		//	hwalk->SetLineColor(kMagenta);		
+			hwalk->Draw();
+		}
+		
+
 		c->Print(Form("%s",p)); 
 	}
 	c->Print(Form("%s]",p)); 
@@ -1621,694 +1787,7 @@ void TRich_Analysis::TDC_PlotSingleChannel(){
 
 
 
-void 	TRich_Analysis::ProcessTDCTEMP(){ // BACK UP copy during sw update	
 
-	printf("%s...\n",__FUNCTION__);
-	bool printEvents 			= true;
-	bool printEdges 			= false;
-	bool printStatistics 	= false;
-	bool hitreconstruction= true;
-
-
-  // RETRIEVE CONFIGURATION PARAMETERS
-
-  UInt_t thr 	= this->GetThreshold();	// get threshold from logbook (individual chip)
-  UInt_t gain 	= this->GetGain();	// get gain from logbook (individual channel)
-  UInt_t ltrigdly	= this->GetTriggerDelay();
-	UInt_t llookback	= this->GetEventBuilderLookBack();
-  UInt_t lwindow	= this->GetEventBuilderWindow();
-  lwindow = 8*lwindow; // in ns
-	
-  printf("Settings MAROC3:\n");
-  printf("Threshold [DAC0 unit] = %d\n",thr);
-  printf("GAIN %4d ",gain);
-  printf("Settings FPGA:\n");
-  printf("Trigger delay           =%5d -> %d*[8ns] = %5d [ns]\n",ltrigdly,ltrigdly,ltrigdly*8);  //128*8ns = 1024ns trigger delay
-  printf("Event Builder LookBack  =%5d -> %d*[8ns] = %5d [ns]\n",llookback,llookback,llookback*8);
-  printf("Event Builder Window	=%5d -> %d*[8ns] = %5d [ns]\n",lwindow,lwindow,lwindow*8);	
-  
-
-
-	// Open parsed data file  
-	TFile * lfile = new TFile(fioTDCroot.c_str(),"UPDATE"); 
-	
-	if (!lfile->IsOpen()) {
-		printf(" File %s not found, please call Ingest()\n",fioTDCroot.c_str());
-		return;
-	
-		if(lfile->IsZombie()){ // ??
-			printf("pFile is Zombie!\n");
-		}
-	}else {
-		printf(" File %s opened\n",fioTDCroot.c_str());	
-	}
-
-	// Retrieve TTree and prepare for reading
-  TTree * ltree = (TTree*)lfile->Get("TDCdata"); // better using a macro in general header
-  
-  UInt_t lEventID	= 0;
-  UInt_t ltstamp0 = 0; 
-  UInt_t ltstamp1 = 0; 
-  UInt_t lnedge =   0;
-  
-  const int maxhit = 10000;  // a small value could create segmentation fault when analising runs with threshold  very close to pedestal
- 
-  UInt_t ltime[maxhit];
-  UInt_t lpolarity[maxhit];
-  UInt_t lchannel[maxhit];
-
-  ltree->SetBranchAddress("triggerID"	,&lEventID);
-  ltree->SetBranchAddress("tstamp0"		,&ltstamp0);
-  ltree->SetBranchAddress("tstamp1"		,&ltstamp1);
-  ltree->SetBranchAddress("nedge"			,&lnedge);
-  ltree->SetBranchAddress("polarity"	,lpolarity);
-  ltree->SetBranchAddress("channel"		,lchannel);
-  ltree->SetBranchAddress("time"			,ltime);
-
-
-  int maxHz = 1000*1000; // 1 MHz
- // int maxEdges = 3*4*64; // max 4 edges/channel per trigger (at the baseline is Billions but they will go in overflow bin)
- int maxEdges = 128; // max 4 edges/channel per trigger (at the baseline is Billions but they will go in overflow bin)
-    
-
-  int totEvts = ltree->GetEntries();
-  
-  // Trigger characterization
-  TH1F * hTRGtime = new TH1F("TRGtime","",totEvts,-0.5,totEvts-0.5);
-  TH1F * hTRGfreq  = new TH1F("TRGfreq","",maxHz,-0.5,maxHz-0.5);	// 1 Hz Resolution
-  
-	// Global response: Number of edges
-  TH1F * hEdges = new TH1F("hEdges","",totEvts,-0.5,totEvts-0.5);
-  TH1F * hEdgesD = new TH1F("hEdges","",maxEdges,-0.5,maxEdges-0.5);
-
-  // Global Time Response
-  int timmax = lwindow;
-  int timmin = 0;
-	
-  TH1F * hTRise = new TH1F("hTRise","",timmax-timmin,timmin-0.5,timmax-0.5);
-  TH1F * hTFall = new TH1F("hTFall","",timmax-timmin,timmin-0.5,timmax-0.5);
-
-  hTRise->SetTitle("ASIC board - Edge Time Distribution");
-  hTFall->SetTitle("ASIC board - Edge Time Distribution");
-
-  TH1F *  hTot = new TH1F("hTot","",500,-250.5,249.5); 
-   
-  TH2F * hTFallvsTot = new TH2F("hTFallvsTot","Charge Correlation with Falling Edge time",500,-250.5,249.5,timmax-timmin,timmin-0.5,timmax-0.5);
-  TH2F * hTRisevsTot = new TH2F("hTRisevsTot","Charge Correlation with Rising Edge time",500,-250.5,249.5,timmax-timmin,timmin-0.5,timmax-0.5);
-
-  //TH2F * hTFallvsTot = new TH2F("hTFallvsTot","Charge Correlation with Falling Edge time",90,-10.5,79.5,80,220-0.5,300-0.5);
-  //TH2F * hTRisevsTot = new TH2F("hTRisevsTot","Charge Correlation with Rising Edge time",90,-10.5,79.5,80,220-0.5,300-0.5);
-
-
-
-
-
-
-// Individual Channel
-  TH1F * hTRiseCh[192]; 
-  TH1F * hTFallCh[192];
-  TH1F * hTotCh[192];
-  TH2F * hTRiseWalkCh[192];
-  TH2F * hTFallWalkCh[192];
-
-	// focus on the region of interest (time and charge)
-	int ltmin = 200;
-	int ltmax = 350;
-	int ltotmin = -10; // must be negative!
-	int ltotmax = 80;	
-	for (int i=0; i<192; i++) {
-
-		timmin = ltmin;
-		timmax = ltmax;
-
-    hTRiseCh[i] 		= new TH1F(Form("ch%03dTRise",i),"",timmax-timmin,timmin-0.5,timmax-0.5);
-    hTFallCh[i] 		= new TH1F(Form("ch%03dTFall",i),"",timmax-timmin,timmin-0.5,timmax-0.5);
-    hTotCh[i] 			= new TH1F(Form("ch%03dTTot",i),"",500,-250.5,249.5); 
-    hTRiseWalkCh[i] = new TH2F(Form("ch%03dTRiseWalk",i),"",ltotmax-ltotmin,ltotmin-0.5,ltotmax-0.5,timmax-timmin,timmin-0.5,timmax-0.5);
-    hTFallWalkCh[i] = new TH2F(Form("ch%03dTFallWalk",i),"",ltotmax-ltotmin,ltotmin-0.5,ltotmax-0.5,timmax-timmin,timmin-0.5,timmax-0.5);
-  }
-  
-
-  
-	
-	// 3 Histograms as Channels summary
-	int nhisto = 9;
-	TH1F * hch[nhisto];
-
-	TH2F * hpx[nhisto];
-	
-	// 0 - Rise entries vs channel
-	// 1 - Fall entries vs channel
-	// 2 - Rise delay vs channel
-	// 3 - Fall delay vs channel
-	// 4 - Rise tts vs channel
-	// 5 - Fall tts vs channel	
-
-
-	// 6 - Duration Entries vs channel 
-	// 7 - Duration Mean vs channel
-	// 8 - Duration RMS vs channel
-
-	for (int i=0; i<nhisto; i++) {
-		hch[i] = new TH1F("","",200,-0.5,199.5);
-		hpx[i] = new TH2F("","",30,0,30,8,0,8);
-
-
-	}
-
-
-	
-	TCanvas* mycanv = new TCanvas("mycanv","",1280-2*SIZEOFCANV,0,2*SIZEOFCANV,SIZEOFCANV);
- 	// TCanvas* mycanv2 = new TCanvas("mycanv2","",1280-2*SIZEOFCANV,0,2*SIZEOFCANV,3*SIZEOFCANV);
-  
-	//	int n_asic = 2
-	//	mycanv2->Divide(2,1);
-	//	mycanv->cd();
-	mycanv->Print(Form("%s[",fTDCpdf.c_str()));
-	
-  // local variables for
-  int polar;
-  int channel;
-  int hittime;
-
-  int polar2;
-  int channel2;
-  int hittime2;
-  
-	int duration; // time over threshold (tot)
-	
-	// controlla chi e' piu grande tra totevents e max event e inizializza il ciclo for
-  
-	int maxevent= totEvts;
-
-	maxevent =10;
-
-	int tothit=0;
-
-  double time_prev = 0.0;
-  double time = 0.0;
-  double dt;
-
-  // LOOP ON EVENTS
-  for(int e = 0;e<maxevent;e++){
-    // reset
-    lEventID = 0;
-    ltstamp0 = 0;
-    ltstamp1 = 0;
-    lnedge = 0;
-    
-    ltree->GetEntry(e);
-    
-    time = this->DecodeTimeStamp(ltstamp0,ltstamp1);
-    dt = time-time_prev;
-    time_prev = time;
-    
-
-    if (printEvents) {
-      if(e!=totEvts-1){
-				if(e%32==0){
-					printf("EVENT LIST:\n");
-				}  
-				printf("ID %4d ",lEventID);   
-				printf("NEdges %3d ",lnedge);   
-				printf("Time %12.10lf [s] ",time);
-				printf("(DT %12.10lf [s],  ",dt);
-      	printf("Freq %6.0lf [Hz])", 1/dt);
-				printf("\n");
-      }
-    }
-
-    hTRGtime->Fill(lEventID,time);
-  	
-		if(e>1&&e!=totEvts-1){
-		// need 2 event to measure dt! first event is skipped,
-		// last event is not filled by TDC_Read so it would give a negative dt
-			hTRGfreq->Fill(1/dt);
-		} 
-
-    hEdges->Fill(lEventID,lnedge);
-    hEdgesD->Fill(lnedge); 
-   
-
-    // LOOP ON EDGES
-    for (int i=0; i<(int)lnedge; i++) {
-      
-			// Read
-      polar = lpolarity[i];
-      channel = lchannel[i];
-      hittime = ltime[i];
-     
-			//Fill
-      switch (polar) {
-      case 0:
-				hTRise->Fill(hittime);
-				hTRiseCh[channel]->Fill(hittime);
-				break;
-      case 1:
-				hTFall->Fill(hittime);
-				hTFallCh[channel]->Fill(hittime);
-				break;
-      default: printf("Error in %s: unknown edge polarity %d\n",__FUNCTION__,polar);
-				break;
-      }
-			
-
-			if(hitreconstruction){			// Hit Reconstruction
-				duration =0;
-				// look for the same channel with opposite polarity and calculate hit duration
- 				for (int j=i+1; j<(int)lnedge; j++){
-					channel2 = lchannel[j];
-					if(channel2==channel){
-						polar2 = lpolarity[j];
-						if(polar2!=polar){
-							hittime2 = ltime[j];	
-							//if(channel==1){
-								if(polar2==1){ // secondo fall
-									duration = hittime-hittime2;	
-								}else{//	secondo e'un rise
-								
-									duration = hittime2-hittime;
-									hTFallvsTot->Fill(duration,hittime);
-									hTRisevsTot->Fill(duration,hittime2);
-									hTFallWalkCh[channel]->Fill(duration,hittime);
-									hTRiseWalkCh[channel]->Fill(duration,hittime2);
-								}
-							//}
-							//duration = hittime2-hittime;
-							tothit++;				
-						//	if(duration<0){
-						//		duration=-duration;
-						//	}
-							hTot->Fill(duration);
-							hTotCh[channel]->Fill(duration);		
-						}
-					}
-				}
-			}      
-			if(printEdges){
-				if(i==0){
-	  			printf("EDEGE LIST\t( Rise  = <  Fall = > )\n");
-				}
-				printf("%3d ",i+1);			
-				printf("CH_%d",channel/64);
-				printf("_%2d ",channel%64);
-	
-				switch(polar){
-					case 0: printf("< "); break;
-					case 1: printf("> ");break;
-					default:break;
-				}
-				printf("%4d  ",hittime);
-				printf("\n");	
-      }	// end of if printf
-    } // end of loop on edges
-  } // end of loop on events
-  
-	printf("HITS = %d\n",tothit);
-
-  gStyle->SetOptStat(111111);	  
-
-	// Outputs and free memory
-  
-	// Event Timestamp
-  mycanv->cd(1)->SetLogy(0);
-  mycanv->cd(1)->SetLogx(0);
-  mycanv->cd(1)->SetGrid(1);
-  hTRGtime->SetTitle("Time Stamp vs Trig ID");
-  hTRGtime->GetXaxis()->SetTitle("Event ID[#]");
-  hTRGtime->GetYaxis()->SetTitle("Time Stamp[s]");
-  hTRGtime->Draw();
-  mycanv->Print(fTDCpdf.c_str());
-  hTRGtime->Write();
-  delete hTRGtime;
-  
-  
-  // Trigger Frequency
-  //hTRGfreq->Scale(1./totEvts);
-  mycanv->cd(1)->SetLogy(1);
-  mycanv->cd(1)->SetLogx(1);
-  hTRGfreq->SetTitle("Trigger Time Interval Distribution ");
-  hTRGfreq->GetXaxis()->SetTitle("Trigger Rate [Hz]");
-  hTRGfreq->GetYaxis()->SetTitle("Occourrency [#]");
-  hTRGfreq->Draw();
-  mycanv->Print(fTDCpdf.c_str());
-  hTRGfreq->Write();
-  delete hTRGfreq;
-  
-  // Edges Multiplicity
-  mycanv->cd(1)->SetLogy(0);
-  mycanv->cd(1)->SetLogx(0);
-  mycanv->cd(1)->SetGrid(1);
-  hEdges->SetTitle("Edges Multiplicity");
-  hEdges->GetXaxis()->SetTitle("Event ID[#]");
-  hEdges->GetYaxis()->SetTitle("N Edges[#]");
-  hEdges->Draw();
-  mycanv->Print(fTDCpdf.c_str());
-  hEdges->Write();
-  delete hEdges;
-  
-  
-  mycanv->cd(1)->SetLogy(1);
-  mycanv->cd(1)->SetLogx(0);
-  //mycanv->cd(1)->SetGrid(1);
-//  hEdgesD->SetMaximum(10E6);
-  hEdgesD->SetTitle("Edges Multiplicity Distribution");
-  hEdgesD->GetXaxis()->SetTitle("N Edges per event[#]");
-  hEdgesD->GetYaxis()->SetTitle("Occourrency [#]");
-  hEdgesD->Draw();
-  mycanv->Print(fTDCpdf.c_str());
-  hEdgesD->Write();
-  delete hEdgesD;
-  
-  // Edge Time Distributuion 
-  
-  this->TDC_Draw(hTRise,hTFall);
-  
-  hTRise->Write();
-  hTFall->Write();
-  
-  delete hTRise;
-  delete hTFall;
-
-
-  mycanv->cd(1)->SetLogy(1);
-  mycanv->cd(1)->SetLogx(0);
-	hTot->SetLineColor(kMagenta);
-
-  hTot->SetTitle("All channel Time Over Threshold");
-  hTot->GetXaxis()->SetTitle("Time Over Threshold [ns]");
-  hTot->GetYaxis()->SetTitle("Occourrency [#]");
-  hTot->Draw();
-  mycanv->Print(fTDCpdf.c_str());
-  hTot->Write();
-  delete hTot;
-
-
-	// Correlation with Rise
-
-	gStyle->SetOptStat(11111);
-
-  mycanv->cd(1)->SetLogy(0);
-  mycanv->cd(1)->SetLogx(0);
-  hTFallvsTot->SetTitle("Charge Correlation with Fall");
-  hTFallvsTot->GetXaxis()->SetTitle("Time over Threshold [ns]");
-  hTFallvsTot->GetYaxis()->SetTitle("Fall edge time [ns]");
-  hTFallvsTot->Draw();
-  mycanv->Print(fTDCpdf.c_str());
-  hTFallvsTot->Draw("COLZ");
-  mycanv->Print(fTDCpdf.c_str());	
-	hTFallvsTot->Write();
-	delete hTFallvsTot;
-
-
-	// Correlation with Rise
-  mycanv->cd(1)->SetLogy(0);
-  mycanv->cd(1)->SetLogx(0);
-  hTRisevsTot->SetTitle("Charge Correlation with Rise");
-  hTRisevsTot->GetXaxis()->SetTitle("Time over Threshold [ns]");
-  hTRisevsTot->GetYaxis()->SetTitle("Rising edge time [ns]");
-  hTRisevsTot->SetLineColor(kBlue);
-  hTRisevsTot->Draw();
-  mycanv->Print(fTDCpdf.c_str());
-  hTRisevsTot->Draw("COLZ");
-  mycanv->Print(fTDCpdf.c_str());
-  hTRisevsTot->Write();
-  delete hTRisevsTot;
-
-  // Histograms are filled
-  // Edge Time Distributuion (single channels)
-	
-	bool enableSingleChannelprint = true;
-
-  TRich_Adapter adapter;
-	
-	int bin; 
-	int bin_offset;
-
-	int pixel;
-	int pixel_offset;
-
-	bool pixel_enable = true; // anodic view instead of electromnic channel
-	bool geo_enable = true; // mapmt view 2 D
-
-	int Xpix_offset;
-	int Ypix;
-	int Xpix;
-
-
-  for (int i = 0; i<192; i++){
-    
-		//if(i%64>=32){continue;}
-
-    int Nrise = hTRiseCh[i]->GetEntries();
-    int Nfall = hTFallCh[i]->GetEntries();
-    int Nhit = hTotCh[i]->GetEntries();
-		    
-    Double_t erise = 1.*Nrise/totEvts;
-    Double_t efall = 1.*Nfall/totEvts;
-    Double_t ehit =  1.*Nhit/totEvts;
-    
-    Double_t trise = hTRiseCh[i]->GetMean();
-    Double_t tfall = hTFallCh[i]->GetMean();
-    Double_t ttot = hTotCh[i]->GetMean();
-		
-    Double_t dtrise = hTRiseCh[i]->GetRMS();
-    Double_t dtfall = hTFallCh[i]->GetRMS();
-    Double_t dttot = hTotCh[i]->GetRMS();
-    
-    hTRiseCh[i]->SetTitle(Form(			" ASIC%d CH%2d - Pixel %d - Rise Eff %.3lf  -  THR %4d  GAIN %3d ",i/64,i%64,adapter.GetAnode(i%64),erise,thr,gain));
-    hTFallCh[i]->SetTitle(Form(			" ASIC%d CH%2d - Pixel %d - Fall Eff %.3lf  -  THR %4d  GAIN %3d ",i/64,i%64,adapter.GetAnode(i%64),efall,thr,gain));
-    hTotCh[i]->SetTitle(Form(				" ASIC%d CH%2d - Pixel %d - Hit Eff %.3lf   -  THR %4d  GAIN %3d ",i/64,i%64,adapter.GetAnode(i%64),ehit,thr,gain)); 
-		hTRiseWalkCh[i]->SetTitle(Form(	" ASIC%d CH%2d - Pixel %d - Rise Walk %.3lf -  THR %4d  GAIN %3d ",i/64,i%64,adapter.GetAnode(i%64),ehit,thr,gain)); 
-		hTFallWalkCh[i]->SetTitle(Form(	" ASIC%d CH%2d - Pixel %d - Fall Walk %.3lf -  THR %4d  GAIN %3d ",i/64,i%64,adapter.GetAnode(i%64),ehit,thr,gain)); 
-
-
-
-		if(enableSingleChannelprint){
-    	this->TDC_Draw(hTRiseCh[i],hTFallCh[i]);
-		}
- 
-		mycanv->cd(1)->SetGrid(1);
-
-   	if(hTotCh[i]->GetEntries()){
-	  	mycanv->cd(1)->SetLogy(1);   
-			hTotCh[i]->SetMaximum(100000);
-    	hTotCh[i]->SetMinimum(.1);
-    	hTotCh[i]->SetLineColor(kMagenta);
-			hTotCh[i]->Draw();
-			if(enableSingleChannelprint){
-				mycanv->Print(Form("%s",fTDCpdf.c_str()));
-			}
-			// Time Walk
-  		mycanv->cd(1)->SetLogy(0);
-			hTFallWalkCh[i]->Draw();
-			if(enableSingleChannelprint){
-				mycanv->Print(Form("%s",fTDCpdf.c_str()));
-			}
-			hTRiseWalkCh[i]->Draw();
-			if(enableSingleChannelprint){
-				mycanv->Print(Form("%s",fTDCpdf.c_str()));
-			}	
-		}
-
-   	// if( Nrise && Nfall){ //	 
-		
-		pixel = adapter.GetAnode(i%64);
-		pixel_offset = (i/64)*64;
-
-		//printf("channel %d -> anode %d ",i,pixel);
-		//printf("asic %d ->offset %d \n",i/64,pixel_offset)	;
-		
-		bin= i;		
-		bin_offset = 0;
-
-		// Pixel ID
-		if(pixel_enable){
-			bin = pixel;
-			bin_offset= pixel_offset;
-		}
-
-	 	hch[0]->Fill(bin+bin_offset,erise);		
-		hch[1]->Fill(bin+bin_offset,efall);
-		hch[2]->Fill(bin+bin_offset,trise);
-		hch[3]->Fill(bin+bin_offset,tfall);			
-		hch[4]->Fill(bin+bin_offset,dtrise);
-		hch[5]->Fill(bin+bin_offset,dtfall);
-		hch[6]->Fill(bin+bin_offset,ehit);
-		hch[7]->Fill(bin+bin_offset,ttot);
-		hch[8]->Fill(bin+bin_offset,dttot);
-
-		
-
-
-		
-		if(geo_enable){
-		//pixel [1..64] 
-			Xpix_offset = i/64*8;
-			Ypix =(pixel-1)/8;
-			Xpix = (pixel-1)%8;
-
-			printf("channel %3d pixel %2d Y %d X %d (%2d mapmt %d)\n",i,pixel,Ypix,Xpix,Xpix+Xpix_offset,i/64);
-		
-
-
-
-	 		hpx[0]->Fill(Xpix+Xpix_offset,Ypix,erise);		
-			hpx[1]->Fill(Xpix+Xpix_offset,Ypix,efall);
-			hpx[2]->Fill(Xpix+Xpix_offset,Ypix,trise);
-			hpx[3]->Fill(Xpix+Xpix_offset,Ypix,tfall);			
-			hpx[4]->Fill(Xpix+Xpix_offset,Ypix,dtrise);
-			hpx[5]->Fill(Xpix+Xpix_offset,Ypix,dtfall);
-			hpx[6]->Fill(Xpix+Xpix_offset,Ypix,ehit);
-			hpx[7]->Fill(Xpix+Xpix_offset,Ypix,ttot);
-			hpx[8]->Fill(Xpix+Xpix_offset,Ypix,dttot);
-
-			hpx[0]->SetTitle("Efficiency Rise");
-			hpx[1]->SetTitle("Efficiency Fall");
-			hpx[2]->SetTitle("Rise Time");
-			hpx[3]->SetTitle("Fall Time");
-			hpx[4]->SetTitle("Jitter Rise");
-			hpx[5]->SetTitle("Jitter Fall");
-			hpx[6]->SetTitle("Efficiency Time Over Threshold");
-			hpx[7]->SetTitle("Time Over THreshold (Charge)");
-			hpx[8]->SetTitle("Tot REsolution (Charge RMS)");
-
-
-			hpx[2]->SetMaximum(ltmax);
-			hpx[2]->SetMinimum(ltmin);
-			hpx[3]->SetMaximum(ltmax);
-			hpx[3]->SetMinimum(ltmin);
-
-		}
-
-  	hTRiseCh[i]->Write();
-  	hTFallCh[i]->Write();
-  	hTotCh[i]->Write();
-		hTFallWalkCh[i]->Write();
-		hTRiseWalkCh[i]->Write();
-			
-		if (printStatistics) {
-			printf("CH_%d_%02d ",i/64,i%64); 
-			printf("RISE %5d %3.0lf%% delay %5.1lf[ns] tts %5.2lf[ns]  ",Nrise,erise*100,trise,dtrise); 
-			//		printf("        "); 
-			printf("FALL %5d %3.0lf%% delay %5.1lf[ns] tts %5.2lf[ns] ", Nfall,efall*100,tfall,dtfall);		
-
-			printf("WIDTH %5d %3.0lf%% delay %5.1lf[ns] tts %5.2lf[ns] ", Nhit,ehit*100,ttot,dttot);				
-			printf("\n");
-		}
-    if(hTRiseCh[i]){delete hTRiseCh[i];}
-    if(hTFallCh[i]){delete hTFallCh[i];}
-    if(hTotCh[i]){delete hTotCh[i];}
-    if(hTRiseWalkCh[i]){delete hTRiseWalkCh[i];}
-    if(hTFallWalkCh[i]){delete hTFallWalkCh[i];}
-
-    //}else {
-			//printf("Warning in %s: Edge distribution missing ch %d\n",__FUNCTION__,i);
-		//}
-
-  }
-	
-	// SUMMARY PLOTS
-  mycanv->cd(1)->SetLogy(0);
-  mycanv->cd(1)->SetLogx(0);
-  mycanv->cd(1)->SetGrid(1);
-	
-	for (int i=0; i<nhisto; i++) {
-		if(hch[i]){
-			hch[i]->SetStats(0);
-			if(pixel_enable){
-				hch[i]->GetXaxis()->SetTitle("Pixel [0..63][0..63][0..63]");
-			}else{
-				hch[i]->GetXaxis()->SetTitle("Channel [0..192]");
-			}			
-			if(i%2==1&&i<6){
-				hch[i]->SetLineColor(kRed);
-			}
-			if(i>=6){
-				hch[i]->SetLineColor(kMagenta);
-			}
-		}
-	}
-	
-	// Efficiency
- // hch[0]->SetMaximum(4.5);
-	hch[0]->GetYaxis()->SetTitle("N Edges /Tot Events");
-  hch[0]->SetTitle("Efficiency");
-	hch[0]->Draw();
-	hch[1]->Draw("SAME");
-
-
-	mycanv->Print(Form("%s",fTDCpdf.c_str()));
-	
-	// Mean Delay
-//	hch[2]->SetMaximum(timmax-timmin);
-	hch[2]->GetYaxis()->SetTitle("Edge Time Average  [ns]");
-  hch[2]->SetTitle("Time Delay");
-	hch[2]->Draw();
-	hch[3]->Draw("SAME");
-	mycanv->Print(Form("%s",fTDCpdf.c_str()));
-	
-	// Jitter
-//	hch[4]->SetMaximum(5);
-	hch[4]->GetYaxis()->SetTitle("Edge Time RMS [ns]");
-  hch[4]->SetTitle("Time Resolution");
-	hch[4]->Draw();
-	hch[5]->Draw("SAME");
-	mycanv->Print(Form("%s",fTDCpdf.c_str()));
-  	
-
-		// Efficiency Duration
-  //	hch[6]->SetMaximum(4.5);
-	hch[6]->GetYaxis()->SetTitle("N Durations /Tot Events");
-  hch[6]->SetTitle("Hit Efficiency");
-	hch[6]->Draw();
-	mycanv->Print(Form("%s",fTDCpdf.c_str()));
-	
-	// Mean Duration
-//	hch[7]->SetMaximum(timmax-timmin);
-	hch[7]->GetYaxis()->SetTitle("Mean Duration [ns]");
-  hch[7]->SetTitle("Time over Threshold ");
-	hch[7]->Draw();
-	mycanv->Print(Form("%s",fTDCpdf.c_str()));
-	
-	// Duration rm
-	//hch[8]->SetMaximum(5);
-	hch[8]->GetYaxis()->SetTitle("RMS Duration[ns]");
-  hch[8]->SetTitle("Time over Threshold RMS");
-	hch[8]->Draw();
-	mycanv->Print(Form("%s",fTDCpdf.c_str()));
-
-
-	for (int i=0; i<nhisto; i++) {
-		if(hch[i]){
-			delete hch[i];
-		}
-		if(hpx[i]){
-  		gStyle->SetOptStat(0);	 
-			hpx[i]->Draw("COLZ");
-			mycanv->Print(Form("%s",fTDCpdf.c_str()));
-			delete hpx[i];
-		}
-	}
-	
-   // close .pdf 
-  mycanv->Print(Form("%s]",fTDCpdf.c_str()));
-  delete mycanv;
-  
-  
-  // CLOSE FILE
-  lfile->Close();	
-  delete lfile;	
-
-
-
-	//printf("Analysis completed successfully\n");
-	printf("Out Data  %s ",fioTDCroot.c_str());
-	printf("\n");
-	printf("Out Plots %s ",fTDCpdf.c_str());
-	printf("\n");
-
-}
 
 
 void	TRich_Analysis::TDC_Plot(int asic,bool draw_single_channel){	
@@ -2334,7 +1813,7 @@ void	TRich_Analysis::TDC_Plot(int asic,bool draw_single_channel){
 		ltree->GetEntry(e);
 		int nrise = 0;
 		int nfall = 0;
-		// look for redorded edges 
+		// look for recorded edges 
 		for (int i =0; i<192; i++) { 
 			if (ltrise[i]!=0) {nrise++;hRise[i]->Fill(ltrise[i]);}
 			if (ltfall[i]!=0) {nfall++;hFall[i]->Fill(ltfall[i]);}

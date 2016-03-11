@@ -20,8 +20,10 @@
 #define SINGLE_RUN 0
 #define SCAN 1
 
-#define PDFPATH  ("../../pdf/")
-#define HISTOPATH  ("../../histo/")
+#define PDFPATH  	("../../pdf/")
+#define HISTOPATH ("../../histo/")
+#define TXTPATH  	("../../txt/")
+#define SCANPATH  ("../../scan/")
 
 
 using namespace std;
@@ -109,20 +111,29 @@ private:
   
   double GetEfficiency(int channel = 0);	
   
-  // TDC
+	// TDC SINGLE RUN
   int		TDC_Read();
 	void 	TDC_Spectra();
 	void 	Plot(); 
-	
+
 	void  TDC_SpectraSingleChannel();
 	void 	TDC_PlotSingleChannel(); 	
-	void 	TDC_GetSingleChannel();
-	
-	
-	void 	ProcessTDC();
-	void 	ProcessTDCTEMP(); // BACK UP copy during sw update
-	void 	ProcessTDCscan();
-  void	TDC_Plot(int asic = 0,bool draw_single_channel= false);	
+
+	void 	TDC_Uniformity();
+	void 	TDC_Image();
+	void 	TDC_Export();
+
+	// TDC SCAN
+	void 	TDC_Scan_Read();
+	void  TDC_Scan_Histo();		// Calculate All the histograms and save it in a scanhisto.root file
+	void  TDC_Scan_Plot1();		// Create a pdf with plors vs THR for different gain
+	void  TDC_Scan_Plot2();  // creates gauguin plot X = channel Y = threshold Z = variable
+	void  TDC_Scan_Plot3();	// creates calibration plots X = threshols, y = gain, z = efficiency/jitter		
+
+
+
+
+	void	TDC_Plot(int asic = 0,bool draw_single_channel= false);	
   void	TDC_Process_SingleEvent();
   
   
@@ -133,11 +144,9 @@ private:
   int SKA_Plot3(float minZ=.1, float maxZ=1.1,int DAC0step=1);	
 
  private:
+	void 	TDC_GetSingleChannel(int opt);
   double DecodeTimeStamp(unsigned int tstamp0=0,unsigned int tstamp1=0);	
   unsigned int GetFPGAParameters(int opt = -1);
   void TDC_Draw(TH1F * hRise ,TH1F * hFall);
-
-
-
 };
 #endif

@@ -1,6 +1,6 @@
 CC=g++
 CFLAGS= -Wall 
-LDFLAGS= -lconfig++  -L. -lmrc #-lrt 
+LDFLAGS= -lconfig++  -L. -lmrc -lrt 
 
 SOURCES= 	TRich_ConnectTCP.cpp \
 		TRich_Frontend.cpp \
@@ -9,7 +9,8 @@ SOURCES= 	TRich_ConnectTCP.cpp \
 		TRich_Analysis.cpp \
 		TRich_Scaler.cpp \
 		TRich_TDC.cpp\
-		TRich_Adapter.cpp
+		TRich_Adapter.cpp\
+		TRich_Calib.cpp
 
 OBJ=$(SOURCES:.cpp=.o)
 LIB=libmrc.so
@@ -32,10 +33,10 @@ all : $(DAQ) $(ANA) $(SOURCES)
 
 $(DAQ):$(MAIN_DAQ) $(LIB)
 	$(CC) -o $(DAQ) $(MAIN_DAQ) $(LDFLAGS) $(ROOTINC) $(ROOTLIB)
-	cp $(DAQ) ../bin
+#	cp $(DAQ) ../bin
 $(ANA):	$(MAIN_ANA) $(LIB)
 	$(CC) -o $(ANA) $(MAIN_ANA) $(LDFLAGS) $(ROOTINC) $(ROOTLIB)
-	cp $(ANA) ../bin
+#	cp $(ANA) ../bin
 $(LIB):	$(OBJ)
 	ar cr $(LIB) $(OBJ)
 .cpp.o: $(SOURCES)
@@ -61,6 +62,7 @@ gzip	:
 	TRich_Scaler.cpp TRich_Scaler.h \
 	TRich_TDC.cpp TRich_TDC.h \
 	TRich_Adapter.cpp TRich_Adapter.h \
+	TRich_Calib.cpp TRich_Calib.h \
 	runme.sh \
 	rich.cfg \
 	datatype.h \

@@ -1283,7 +1283,7 @@ int main(int argc, char *argv[])
 
 	/* CTest */
 	rich_write32(&pRICH_regs->Sd.CTestSrc, SD_SRC_SEL_PULSER);
-	int trig_delay = 5 ;// [clock ticks unit]
+	int trig_delay = 0 ;// [clock ticks unit]
 	rich_write32(&pRICH_regs->Sd.CTestDelay, trig_delay); 
 
 	/* Configure DAC */
@@ -1318,12 +1318,12 @@ int main(int argc, char *argv[])
 	{
 
 //	rich_ctest_amp(1.0);
-
+/*
 	rich_ctest_amp(ctest_pC);
 	ctest_pC = ctest_pC + 0.002;
 	if(ctest_pC > 2.0) ctest_pC = 0.0;
 	usleep(10000);
-
+*/
 	//sleep(1);
 
 
@@ -1356,8 +1356,8 @@ int main(int argc, char *argv[])
 //		rich_fifo_status();
 //	rich_dump_scalers();
 //sleep(1);
-	//	rich_check_adc();
-		//usleep(1000);
+		rich_check_adc();
+		usleep(1000);
 
 //		printf(".");
 //		fflush(stdout);

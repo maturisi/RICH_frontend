@@ -191,9 +191,7 @@ long long  TRich_DAQ::DoEv(int verbosity){
 
 	int n;
 	bool dbg = false; 
-	bool onlineparse=false;
-  int tag = 15;
-  int tag_idx = 0;
+//	bool onlineparse=false;
 
   switch(mode){
 

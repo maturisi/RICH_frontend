@@ -122,32 +122,40 @@ int main(int argc, char *argv[]){
       	return -1;
     	}
 
-			
 			runName = argv[2];
 			runID_last = atoi(argv[3]);
 			runID  = A.NameRun(runName.c_str(),runID_last);
-
-			if(runID==-1) {printf("file doesn't exist\n");break;}
-			
+			if(runID==-1) {printf("file doesn't exist\n");break;}			
 			if(runID==-2){printf("Error with run ID\n");break;}
-		
-			//A.Ingest(); // parse .bin into root file
+
+
+			A.Ingest();
 
 			if(A.SingleRun()){
-				// board
-			//	A.TDC_Spectra();
-			//	A.Plot();
+
+				// processing
+				A.TDC_Spectra();// board
+				A.TDC_SpectraSingleChannel();// single channel
 				
-				// single channel
-				A.TDC_SpectraSingleChannel();
-				A.TDC_PlotSingleChannel();
-				//A.TDC_GetSingleChannel();
 				
-				//A.ProcessTDC(); // new! man at work // add histogram to rootfile				
-				//A.ProcessTDCTEMP();// old
+				// graphics
+				A.Plot();// board
+				A.TDC_PlotSingleChannel();// single channel
+				A.TDC_Export(); 
+				A.TDC_Uniformity(); 	// single channel
+				A.TDC_Image(); 				// single channel
+
 			}
 			if(A.Scan()){
-				A.ProcessTDCscan();
+
+				// processing
+				A.TDC_Scan_Histo();		
+
+				// graphics
+				A.TDC_Scan_Plot1();		
+				A.TDC_Scan_Plot2(); // Gauguin
+				//A.TDC_Scan_Plot3();			
+				
 			}
 			break;
   		default:

@@ -50,7 +50,6 @@ TRich_TDC::~TRich_TDC()
 
 void	TRich_TDC::Write(){
 	ftree->Write(); 
-
 }
 
 
@@ -448,7 +447,6 @@ bool TRich_TDC::OpenFile(const char * filename){
 
 	if(filename==NULL) return false;
 
-
 	ffile = new TFile(filename,"READ"); 
 	
 	if (!ffile->IsOpen()){
@@ -480,7 +478,6 @@ int TRich_TDC::RetrieveTree(){
   ftree->SetBranchAddress("polarity"	,fpolarity);
   ftree->SetBranchAddress("channel"		,fchannel);
   ftree->SetBranchAddress("time"			,ftime);
-
 
 
 	return nentries;
